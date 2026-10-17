@@ -67,14 +67,14 @@ ${newsText}
 
 Hãy chọn 1 tin tức mang tính xu hướng hoặc bài học cho doanh nghiệp nhất, sau đó viết kịch bản video dọc 30 giây (TikTok/Reels) theo chuẩn format JSON:
 {
-  "title": "Tiêu đề gây tò mò, giật tít chuyên nghiệp (tối đa 9 từ, viết hoa chữ cái đầu)",
+  "title": "Tiêu đề gây tò mò, giật tít chuyên nghiệp (viết hoa chữ cái đầu)",
   "points": [
-    "Luận điểm 1: Nêu vấn đề hoặc insight thực tế (tối đa 11 từ)",
-    "Luận điểm 2: Giải pháp công nghệ từ Website/Phần mềm (tối đa 11 từ)",
-    "Luận điểm 3: Lợi ích tăng trưởng hoặc tiết kiệm chi phí (tối đa 11 từ)"
+    "Luận điểm 1: Nêu vấn đề hoặc insight thực tế doanh nghiệp hay gặp",
+    "Luận điểm 2: Giải pháp công nghệ từ Website hoặc Phần mềm tự động hóa",
+    "Luận điểm 3: Lợi ích tăng trưởng doanh số hoặc tiết kiệm chi phí"
   ],
-  "cta": "Nhắn tin cho Nexo Studio để nhận giải pháp!",
-  "voiceScript": "Lời thoại đọc cho toàn bộ video (khoảng 80-100 từ tiếng Việt). Ngữ điệu tự nhiên, dứt khoát, chuyên nghiệp, bắt đầu bằng một câu hook gây chú ý và kết thúc bằng lời kêu gọi liên hệ Nexo Studio.",
+  "cta": "Nhắn tin cho Nexo Studio để nhận tư vấn miễn phí!",
+  "voiceScript": "Lời thoại đọc cho toàn bộ video. Hãy viết thật tự nhiên, phóng khoáng, cuốn hút và liền mạch như một chuyên gia đang chia sẻ kinh nghiệm thực tế. Có câu mở đầu gây chú ý (hook), giải thích cặn kẽ giải pháp và kết bài kêu gọi liên hệ Nexo Studio. Thoải mái diễn đạt sao cho đọc vừa vặn trọn vẹn trong khoảng 25 đến 28 giây (không quá 30 giây).",
   "hashtags": "#nexostudio #thietkewebsite #phanmemdoanhnghiep #chuyendoiso #congnghe2026",
   "backgroundIndex": 0
 }
