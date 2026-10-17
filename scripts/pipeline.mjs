@@ -161,32 +161,24 @@ async function renderVideo(script, audioPath) {
   return outPath;
 }
 
-// ─── Bước 5: Upload video để lấy link public cho Facebook ─────────────────────
+// ─── Bước 5: Upload video lên GitHub Release CDN cho Facebook ─────────────────
 async function uploadToDrive(videoPath) {
-  console.log("☁️ Đang upload video lấy link công khai cho Facebook...");
-  const FormData = (await import("form-data")).default;
-  const form = new FormData();
-  form.append("reqtype", "fileupload");
-  form.append("fileToUpload", fs.createReadStream(videoPath));
+  console.log("☁️ Đang upload video lên GitHub CDN Storage...");
+  const tag = `v${Date.now()}`;
+  const fileName = path.basename(videoPath);
 
   try {
-    const res = await axios.post("https://catbox.moe/user/api.php", form, {
-      headers: form.getHeaders(),
-      timeout: 120000,
-    });
-    const publicUrl = res.data.trim();
-    console.log("✅ Upload xong (Catbox CDN):", publicUrl);
+    // Dùng GitHub CLI đẩy lên repo public video-storage
+    execSync(
+      `gh release create "${tag}" "${videoPath}#video.mp4" --title "Video ${new Date().toISOString().slice(0, 10)}" --notes "Automated video release" --repo chithong2k2/video-storage`,
+      { stdio: "inherit" }
+    );
+    const publicUrl = `https://github.com/chithong2k2/video-storage/releases/download/${tag}/video.mp4`;
+    console.log("✅ Upload xong (GitHub CDN direct link):", publicUrl);
     return publicUrl;
   } catch (err) {
-    console.warn("⚠️ Upload Catbox fail, thử tmpfiles...");
-    const form2 = new FormData();
-    form2.append("file", fs.createReadStream(videoPath));
-    const res2 = await axios.post("https://tmpfiles.org/api/v1/upload", form2, {
-      headers: form2.getHeaders(),
-    });
-    const downloadUrl = res2.data.data.url.replace("tmpfiles.org/", "tmpfiles.org/dl/");
-    console.log("✅ Upload xong (Tmpfiles):", downloadUrl);
-    return downloadUrl;
+    console.error("❌ Lỗi upload GitHub release:", err.message);
+    throw err;
   }
 }
 

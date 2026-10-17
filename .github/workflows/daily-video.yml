@@ -10,6 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -24,26 +27,18 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            chromium-browser \
             fonts-noto \
             fonts-noto-cjk
 
       - name: Install dependencies
         run: npm install
 
-      # Google Drive auth qua service account JSON
-      - name: Setup Google credentials
-        run: echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' > /tmp/gcp-key.json
-
       - name: Run pipeline
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
-          GOOGLE_TTS_API_KEY: ${{ secrets.GOOGLE_TTS_API_KEY }}
-          GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-key.json
-          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
           ACTIVEPIECES_WEBHOOK_URL: ${{ secrets.ACTIVEPIECES_WEBHOOK_URL }}
-          REMOTION_CHROMIUM_PATH: /usr/bin/chromium-browser
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node scripts/pipeline.mjs
 
       # Giữ video như artifact phòng khi cần debug
