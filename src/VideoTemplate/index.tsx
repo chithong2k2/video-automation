@@ -201,6 +201,7 @@ export const VideoTemplate: React.FC<VideoTemplateProps> = ({
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
                 textShadow: "0 10px 30px rgba(0,0,0,0.5)",
+                textWrap: "balance" as any,
               }}
             >
               {title}

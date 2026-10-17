@@ -53,8 +53,7 @@ async function generateScript(newsItems) {
   console.log("🤖 Gemini đang viết script video...");
 
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-  // Dùng model mới nhất được khuyến nghị bởi Google
-  const model = genAI.getGenerativeModel({ model: "gemini-3.8-flash" });
+  const modelsToTry = ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash"];
 
   const newsText = newsItems
     .map((n, i) => `${i + 1}. ${n.title}: ${n.text?.slice(0, 200) ?? ""}`)
@@ -83,12 +82,26 @@ Hãy chọn 1 tin tức mang tính xu hướng hoặc bài học cho doanh nghi�
 Chỉ trả về cú pháp JSON hợp lệ, không giải thích gì thêm.
 `;
 
-  const result = await model.generateContent(prompt);
-  const text = result.response.text().replace(/```json|```/g, "").trim();
+  let lastError;
+  for (const modelName of modelsToTry) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        console.log(`📡 Thử model ${modelName} (Lần ${attempt})...`);
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const result = await model.generateContent(prompt);
+        const text = result.response.text().replace(/```json|```/g, "").trim();
+        const script = JSON.parse(text);
+        console.log(`✅ Script thành công từ [${modelName}]: "${script.title}"`);
+        return script;
+      } catch (err) {
+        lastError = err;
+        console.warn(`⚠️ [${modelName}] Lần ${attempt} lỗi: ${err.message}. Đợi 3s...`);
+        await new Promise((r) => setTimeout(r, 3000));
+      }
+    }
+  }
 
-  const script = JSON.parse(text);
-  console.log(`✅ Script: "${script.title}"`);
-  return script;
+  throw lastError;
 }
 
 // ─── Bước 3: Tạo giọng đọc Microsoft Edge-TTS siêu tự nhiên ────────────────────
