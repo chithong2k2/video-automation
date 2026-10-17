@@ -53,7 +53,8 @@ async function generateScript(newsItems) {
   console.log("🤖 Gemini đang viết script video...");
 
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  // Dùng model mới nhất được hỗ trợ
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
   const newsText = newsItems
     .map((n, i) => `${i + 1}. ${n.title}: ${n.text?.slice(0, 200) ?? ""}`)
@@ -90,32 +91,40 @@ Chỉ trả về JSON, không giải thích thêm.
   return script;
 }
 
-// ─── Bước 3: Google TTS tạo voice ────────────────────────────────────────────
+// ─── Bước 3: Tạo giọng đọc tiếng Việt ─────────────────────────────────────────
 async function generateVoice(voiceScript) {
   console.log("🎙️ Đang tạo giọng đọc...");
-
-  const res = await axios.post(
-    `https://texttospeech.googleapis.com/v1/text:synthesize?key=${GOOGLE_TTS_API_KEY}`,
-    {
-      input: { text: voiceScript },
-      voice: {
-        languageCode: "vi-VN",
-        name: "vi-VN-Neural2-A", // Giọng nữ Việt Nam tự nhiên
-        ssmlGender: "FEMALE",
-      },
-      audioConfig: {
-        audioEncoding: "MP3",
-        speakingRate: 1.05,
-        pitch: 1.0,
-      },
-    }
-  );
-
   const audioPath = path.join(ROOT, "out", "voice.mp3");
   fs.mkdirSync(path.join(ROOT, "out"), { recursive: true });
-  fs.writeFileSync(audioPath, Buffer.from(res.data.audioContent, "base64"));
 
-  console.log("✅ Voice saved:", audioPath);
+  if (GOOGLE_TTS_API_KEY) {
+    try {
+      const res = await axios.post(
+        `https://texttospeech.googleapis.com/v1/text:synthesize?key=${GOOGLE_TTS_API_KEY}`,
+        {
+          input: { text: voiceScript },
+          voice: {
+            languageCode: "vi-VN",
+            name: "vi-VN-Neural2-A",
+            ssmlGender: "FEMALE",
+          },
+          audioConfig: { audioEncoding: "MP3", speakingRate: 1.05, pitch: 1.0 },
+        }
+      );
+      fs.writeFileSync(audioPath, Buffer.from(res.data.audioContent, "base64"));
+      console.log("✅ Voice Cloud TTS saved:", audioPath);
+      return audioPath;
+    } catch (err) {
+      console.warn("⚠️ Google Cloud TTS fail, fallback sang gTTS miễn phí...");
+    }
+  }
+
+  // Fallback: Google Translate TTS (Miễn phí 100%, không cần API key)
+  const cleanText = voiceScript.slice(0, 200); // gTTS giới hạn ký tự ngắn
+  const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(cleanText)}&tl=vi&client=tw-ob`;
+  const response = await axios.get(ttsUrl, { responseType: "arraybuffer", headers: { "User-Agent": "Mozilla/5.0" } });
+  fs.writeFileSync(audioPath, Buffer.from(response.data));
+  console.log("✅ Voice gTTS saved:", audioPath);
   return audioPath;
 }
 
@@ -143,41 +152,33 @@ async function renderVideo(script, audioPath) {
   return outPath;
 }
 
-// ─── Bước 5: Upload lên Google Drive ─────────────────────────────────────────
+// ─── Bước 5: Upload video để lấy link public cho Facebook ─────────────────────
 async function uploadToDrive(videoPath) {
-  console.log("☁️ Đang upload lên Google Drive...");
+  console.log("☁️ Đang upload video lấy link công khai cho Facebook...");
+  const FormData = (await import("form-data")).default;
+  const form = new FormData();
+  form.append("reqtype", "fileupload");
+  form.append("fileToUpload", fs.createReadStream(videoPath));
 
-  // Dùng Google Drive API v3
-  const { google } = await import("googleapis");
-  const auth = new google.auth.GoogleAuth({
-    scopes: ["https://www.googleapis.com/auth/drive.file"],
-  });
-
-  const drive = google.drive({ version: "v3", auth });
-  const fileName = `video_${new Date().toISOString().slice(0, 10)}.mp4`;
-
-  const res = await drive.files.create({
-    requestBody: {
-      name: fileName,
-      mimeType: "video/mp4",
-      parents: GOOGLE_DRIVE_FOLDER_ID ? [GOOGLE_DRIVE_FOLDER_ID] : [],
-    },
-    media: {
-      mimeType: "video/mp4",
-      body: fs.createReadStream(videoPath),
-    },
-    fields: "id, webContentLink",
-  });
-
-  // Set public permission
-  await drive.permissions.create({
-    fileId: res.data.id,
-    requestBody: { role: "reader", type: "anyone" },
-  });
-
-  const publicUrl = `https://drive.google.com/uc?export=download&id=${res.data.id}`;
-  console.log("✅ Upload xong:", publicUrl);
-  return publicUrl;
+  try {
+    const res = await axios.post("https://catbox.moe/user/api.php", form, {
+      headers: form.getHeaders(),
+      timeout: 120000,
+    });
+    const publicUrl = res.data.trim();
+    console.log("✅ Upload xong (Catbox CDN):", publicUrl);
+    return publicUrl;
+  } catch (err) {
+    console.warn("⚠️ Upload Catbox fail, thử tmpfiles...");
+    const form2 = new FormData();
+    form2.append("file", fs.createReadStream(videoPath));
+    const res2 = await axios.post("https://tmpfiles.org/api/v1/upload", form2, {
+      headers: form2.getHeaders(),
+    });
+    const downloadUrl = res2.data.data.url.replace("tmpfiles.org/", "tmpfiles.org/dl/");
+    console.log("✅ Upload xong (Tmpfiles):", downloadUrl);
+    return downloadUrl;
+  }
 }
 
 // ─── Bước 6: Trigger Activepieces webhook ────────────────────────────────────
