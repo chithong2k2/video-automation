@@ -31,7 +31,9 @@ jobs:
             fonts-noto-cjk
 
       - name: Install dependencies
-        run: npm install
+        run: |
+          npm install
+          pip install edge-tts
 
       - name: Run pipeline
         env:

@@ -61,26 +61,26 @@ async function generateScript(newsItems) {
     .join("\n");
 
   const prompt = `
-Bạn là copywriter chuyên tạo nội dung video ngắn cho dịch vụ thiết kế website và phần mềm doanh nghiệp.
+Bạn là Giám đốc Sáng tạo (Creative Director) của Nexo Studio - Agency chuyên Thiết kế Website và Phát triển Phần mềm Doanh nghiệp tại Việt Nam.
 
-Tin tức mới nhất:
+Tin tức công nghệ mới nhất:
 ${newsText}
 
-Hãy chọn tin phù hợp nhất và tạo script video 30 giây theo format JSON sau:
+Hãy chọn 1 tin tức mang tính xu hướng hoặc bài học cho doanh nghiệp nhất, sau đó viết kịch bản video dọc 30 giây (TikTok/Reels) theo chuẩn format JSON:
 {
-  "title": "Tiêu đề ngắn gọn, gây tò mò (tối đa 10 từ)",
+  "title": "Tiêu đề gây tò mò, giật tít chuyên nghiệp (tối đa 9 từ, viết hoa chữ cái đầu)",
   "points": [
-    "Điểm 1 ngắn gọn (tối đa 10 từ)",
-    "Điểm 2 ngắn gọn (tối đa 10 từ)",
-    "Điểm 3 ngắn gọn (tối đa 10 từ)"
+    "Luận điểm 1: Nêu vấn đề hoặc insight thực tế (tối đa 11 từ)",
+    "Luận điểm 2: Giải pháp công nghệ từ Website/Phần mềm (tối đa 11 từ)",
+    "Luận điểm 3: Lợi ích tăng trưởng hoặc tiết kiệm chi phí (tối đa 11 từ)"
   ],
-  "cta": "Call to action ngắn (tối đa 8 từ)",
-  "voiceScript": "Script đọc cho toàn bộ video (150-200 từ tiếng Việt, tự nhiên, thân thiện)",
-  "hashtags": "#hashtag1 #hashtag2 #hashtag3 #hashtag4 #hashtag5",
+  "cta": "Nhắn tin cho Nexo Studio để nhận giải pháp!",
+  "voiceScript": "Lời thoại đọc cho toàn bộ video (khoảng 80-100 từ tiếng Việt). Ngữ điệu tự nhiên, dứt khoát, chuyên nghiệp, bắt đầu bằng một câu hook gây chú ý và kết thúc bằng lời kêu gọi liên hệ Nexo Studio.",
+  "hashtags": "#nexostudio #thietkewebsite #phanmemdoanhnghiep #chuyendoiso #congnghe2026",
   "backgroundIndex": 0
 }
 
-Chỉ trả về JSON, không giải thích thêm.
+Chỉ trả về cú pháp JSON hợp lệ, không giải thích gì thêm.
 `;
 
   const result = await model.generateContent(prompt);
@@ -91,50 +91,39 @@ Chỉ trả về JSON, không giải thích thêm.
   return script;
 }
 
-// ─── Bước 3: Tạo giọng đọc tiếng Việt ─────────────────────────────────────────
+// ─── Bước 3: Tạo giọng đọc Microsoft Edge-TTS siêu tự nhiên ────────────────────
 async function generateVoice(voiceScript) {
-  console.log("🎙️ Đang tạo giọng đọc...");
+  console.log("🎙️ Đang tạo giọng đọc Microsoft Neural Voice...");
   const publicAudioPath = path.join(ROOT, "public", "voice.mp3");
   const outAudioPath = path.join(ROOT, "out", "voice.mp3");
+  const tempTextPath = path.join(ROOT, "out", "temp_voice.txt");
+
   fs.mkdirSync(path.join(ROOT, "public"), { recursive: true });
   fs.mkdirSync(path.join(ROOT, "out"), { recursive: true });
+  fs.writeFileSync(tempTextPath, voiceScript, "utf-8");
 
-  let audioBuffer;
-
-  if (GOOGLE_TTS_API_KEY) {
-    try {
-      const res = await axios.post(
-        `https://texttospeech.googleapis.com/v1/text:synthesize?key=${GOOGLE_TTS_API_KEY}`,
-        {
-          input: { text: voiceScript },
-          voice: {
-            languageCode: "vi-VN",
-            name: "vi-VN-Neural2-A",
-            ssmlGender: "FEMALE",
-          },
-          audioConfig: { audioEncoding: "MP3", speakingRate: 1.05, pitch: 1.0 },
-        }
-      );
-      audioBuffer = Buffer.from(res.data.audioContent, "base64");
-      console.log("✅ Voice Cloud TTS generated");
-    } catch (err) {
-      console.warn("⚠️ Google Cloud TTS fail, fallback sang gTTS miễn phí...");
-    }
-  }
-
-  if (!audioBuffer) {
-    // Fallback: Google Translate TTS (Miễn phí 100%, không cần API key)
+  try {
+    // Ưu tiên Edge-TTS: Giọng đọc truyền cảm, chuẩn ngữ điệu người thật, không bao giờ ngắt tiếng
+    execSync(`python scripts/tts.py "${tempTextPath}" "${publicAudioPath}"`, {
+      cwd: ROOT,
+      stdio: "inherit",
+    });
+    fs.copyFileSync(publicAudioPath, outAudioPath);
+    console.log("✅ Voice Edge-TTS saved successfully to public/voice.mp3");
+    return "voice.mp3";
+  } catch (err) {
+    console.warn("⚠️ Edge-TTS failed, fallback sang gTTS...", err.message);
     const cleanText = voiceScript.slice(0, 200);
     const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(cleanText)}&tl=vi&client=tw-ob`;
-    const response = await axios.get(ttsUrl, { responseType: "arraybuffer", headers: { "User-Agent": "Mozilla/5.0" } });
-    audioBuffer = Buffer.from(response.data);
-    console.log("✅ Voice gTTS generated");
+    const response = await axios.get(ttsUrl, {
+      responseType: "arraybuffer",
+      headers: { "User-Agent": "Mozilla/5.0" },
+    });
+    fs.writeFileSync(publicAudioPath, Buffer.from(response.data));
+    fs.writeFileSync(outAudioPath, Buffer.from(response.data));
+    console.log("✅ Voice gTTS saved");
+    return "voice.mp3";
   }
-
-  fs.writeFileSync(publicAudioPath, audioBuffer);
-  fs.writeFileSync(outAudioPath, audioBuffer);
-  console.log("✅ Voice saved to public/voice.mp3");
-  return "voice.mp3";
 }
 
 // ─── Bước 4: Render Remotion video ───────────────────────────────────────────
