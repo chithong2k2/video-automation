@@ -1,9 +1,9 @@
-import React from "react";
 import {
   AbsoluteFill,
   Audio,
   interpolate,
   spring,
+  staticFile,
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
@@ -85,7 +85,15 @@ export const VideoTemplate: React.FC<VideoTemplateProps> = ({
       </AbsoluteFill>
 
       {/* Audio */}
-      {audioUrl ? <Audio src={audioUrl} /> : null}
+      {audioUrl ? (
+        <Audio
+          src={
+            audioUrl.startsWith("http://") || audioUrl.startsWith("https://")
+              ? audioUrl
+              : staticFile("voice.mp3")
+          }
+        />
+      ) : null}
 
       {/* Main content */}
       <AbsoluteFill style={{ padding: "80px 60px", justifyContent: "center" }}>

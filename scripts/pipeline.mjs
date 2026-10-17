@@ -94,8 +94,12 @@ Chỉ trả về JSON, không giải thích thêm.
 // ─── Bước 3: Tạo giọng đọc tiếng Việt ─────────────────────────────────────────
 async function generateVoice(voiceScript) {
   console.log("🎙️ Đang tạo giọng đọc...");
-  const audioPath = path.join(ROOT, "out", "voice.mp3");
+  const publicAudioPath = path.join(ROOT, "public", "voice.mp3");
+  const outAudioPath = path.join(ROOT, "out", "voice.mp3");
+  fs.mkdirSync(path.join(ROOT, "public"), { recursive: true });
   fs.mkdirSync(path.join(ROOT, "out"), { recursive: true });
+
+  let audioBuffer;
 
   if (GOOGLE_TTS_API_KEY) {
     try {
@@ -111,21 +115,26 @@ async function generateVoice(voiceScript) {
           audioConfig: { audioEncoding: "MP3", speakingRate: 1.05, pitch: 1.0 },
         }
       );
-      fs.writeFileSync(audioPath, Buffer.from(res.data.audioContent, "base64"));
-      console.log("✅ Voice Cloud TTS saved:", audioPath);
-      return audioPath;
+      audioBuffer = Buffer.from(res.data.audioContent, "base64");
+      console.log("✅ Voice Cloud TTS generated");
     } catch (err) {
       console.warn("⚠️ Google Cloud TTS fail, fallback sang gTTS miễn phí...");
     }
   }
 
-  // Fallback: Google Translate TTS (Miễn phí 100%, không cần API key)
-  const cleanText = voiceScript.slice(0, 200); // gTTS giới hạn ký tự ngắn
-  const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(cleanText)}&tl=vi&client=tw-ob`;
-  const response = await axios.get(ttsUrl, { responseType: "arraybuffer", headers: { "User-Agent": "Mozilla/5.0" } });
-  fs.writeFileSync(audioPath, Buffer.from(response.data));
-  console.log("✅ Voice gTTS saved:", audioPath);
-  return audioPath;
+  if (!audioBuffer) {
+    // Fallback: Google Translate TTS (Miễn phí 100%, không cần API key)
+    const cleanText = voiceScript.slice(0, 200);
+    const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(cleanText)}&tl=vi&client=tw-ob`;
+    const response = await axios.get(ttsUrl, { responseType: "arraybuffer", headers: { "User-Agent": "Mozilla/5.0" } });
+    audioBuffer = Buffer.from(response.data);
+    console.log("✅ Voice gTTS generated");
+  }
+
+  fs.writeFileSync(publicAudioPath, audioBuffer);
+  fs.writeFileSync(outAudioPath, audioBuffer);
+  console.log("✅ Voice saved to public/voice.mp3");
+  return "voice.mp3";
 }
 
 // ─── Bước 4: Render Remotion video ───────────────────────────────────────────
@@ -136,7 +145,7 @@ async function renderVideo(script, audioPath) {
     title: script.title,
     points: script.points,
     cta: script.cta,
-    audioUrl: `file://${audioPath}`,
+    audioUrl: audioPath,
     backgroundIndex: script.backgroundIndex ?? 0,
     hashtags: script.hashtags,
   });
