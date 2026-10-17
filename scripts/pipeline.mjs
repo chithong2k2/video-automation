@@ -165,15 +165,14 @@ async function renderVideo(script, audioPath) {
 async function uploadToDrive(videoPath) {
   console.log("☁️ Đang upload video lên GitHub CDN Storage...");
   const tag = `v${Date.now()}`;
-  const fileName = path.basename(videoPath);
 
   try {
-    // Dùng GitHub CLI đẩy lên repo public video-storage
+    // Đẩy release lên chính repo video-automation (Public)
     execSync(
-      `gh release create "${tag}" "${videoPath}#video.mp4" --title "Video ${new Date().toISOString().slice(0, 10)}" --notes "Automated video release" --repo chithong2k2/video-storage`,
+      `gh release create "${tag}" "${videoPath}#video.mp4" --title "Daily Video ${new Date().toISOString().slice(0, 10)}" --notes "Automated daily video" --repo chithong2k2/video-automation`,
       { stdio: "inherit" }
     );
-    const publicUrl = `https://github.com/chithong2k2/video-storage/releases/download/${tag}/video.mp4`;
+    const publicUrl = `https://github.com/chithong2k2/video-automation/releases/download/${tag}/video.mp4`;
     console.log("✅ Upload xong (GitHub CDN direct link):", publicUrl);
     return publicUrl;
   } catch (err) {
