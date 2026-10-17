@@ -19,20 +19,13 @@ if (!GEMINI_API_KEY) {
   process.exit(1);
 }
 
-// ─── Bước 1: Exa AI lấy tin tức công nghệ / kinh doanh mới nhất ────────────────
+// ─── Bước 1: Exa AI tìm kiếm tin tức thực tế trên Internet ────────────────────
 async function fetchNews(topicQuery = "AI startup tech business Vietnam 2026") {
-  console.log(`🔍 Exa AI đang tìm kiếm tin tức mới nhất theo chủ đề: "${topicQuery}"...`);
+  console.log(`🔍 Exa AI đang tìm kiếm tin tức thật trên Internet theo từ khóa: "${topicQuery}"...`);
 
   if (!EXA_API_KEY) {
-    console.log("⚠️ Không có EXA_API_KEY, dùng tin tức dự phòng.");
-    return [
-      {
-        title: "Anthropic và OpenAI ra mắt thế hệ AI Agent mới có khả năng tự động hóa quy trình phần mềm doanh nghiệp",
-        text: "Các mô hình AI mới nhất không chỉ viết code mà còn kết nối trực tiếp với API, quản trị cơ sở dữ liệu và vận hành hệ thống chăm sóc khách hàng tự động 24/7.",
-        url: "https://techcrunch.com",
-        publishedDate: new Date().toISOString(),
-      },
-    ];
+    console.log("⚠️ Không tìm thấy EXA_API_KEY trong môi trường cục bộ. Yêu cầu có EXA_API_KEY để tìm tin tức trực tiếp.");
+    return [];
   }
 
   try {
@@ -42,7 +35,7 @@ async function fetchNews(topicQuery = "AI startup tech business Vietnam 2026") {
         query: topicQuery,
         numResults: 5,
         useAutoprompt: true,
-        contents: { text: { maxCharacters: 600 } },
+        contents: { text: { maxCharacters: 800 } },
       },
       {
         headers: {
@@ -59,241 +52,504 @@ async function fetchNews(topicQuery = "AI startup tech business Vietnam 2026") {
       publishedDate: r.publishedDate,
     }));
 
-    console.log(`✅ Lấy được ${items.length} tin tức xác thực từ Exa AI`);
+    console.log(`✅ Lấy được ${items.length} tin tức thực tế từ Exa AI`);
     return items;
   } catch (err) {
-    console.warn("⚠️ Lỗi Exa AI, dùng tin tức dự phòng:", err.message);
-    return [
-      {
-        title: "Doanh nghiệp tiết kiệm chi phí vận hành nhờ tối ưu hóa phần mềm quản trị",
-        text: "Xu hướng chuyển đổi số mạnh mẽ năm 2026 tập trung vào các hệ sinh thái phần mềm tự động hóa tùy chỉnh theo nhu cầu doanh nghiệp.",
-        url: "",
-        publishedDate: new Date().toISOString(),
-      },
-    ];
+    console.warn("⚠️ Lỗi gọi Exa AI:", err.message);
+    return [];
   }
 }
 
-// ─── PROMPT 1: BẢN TIN CÔNG NGHỆ & KINH DOANH HẰNG NGÀY (DAILY TECH NEWS) ──────
-async function generateDailyNewsScript(newsItems) {
-  console.log("📰 [PROMPT BẢN TIN] Biên tập viên đang viết bản tin công nghệ & kinh doanh (35-45s)...");
+// ══════════════════════════════════════════════════════════════════════════════
+// PROMPT 1: NEXO STUDIO — AI STORYTELLING & SOFTWARE SOLUTION VIDEO DIRECTOR
+// ══════════════════════════════════════════════════════════════════════════════
+async function generateStorytellingScript(newsItems) {
+  console.log("💡 [PROMPT 1] Kích hoạt NEXO STUDIO — AI STORYTELLING & SOFTWARE SOLUTION VIDEO DIRECTOR...");
 
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
   const modelsToTry = ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash"];
 
-  const newsText = newsItems
-    .map(
-      (n, i) =>
-        `${i + 1}. [${n.publishedDate || "Hôm nay"}] ${n.title}\nNguồn: ${n.url || "Nguồn tin cậy"}\nNội dung: ${n.text?.slice(0, 300) ?? ""}`
-    )
-    .join("\n\n");
+  const contextText = newsItems && newsItems.length > 0
+    ? newsItems.map((n, i) => `${i + 1}. ${n.title} (Nguồn: ${n.url || "Web"}): ${n.text?.slice(0, 300) ?? ""}`).join("\n\n")
+    : "Tự động hóa quản lý doanh nghiệp, số hóa quy trình kinh doanh, tối ưu trải nghiệm khách hàng.";
 
   const prompt = `
-# PROMPT AI — NEXO STUDIO DAILY TECH & BUSINESS NEWS
+# NEXO STUDIO — AI STORYTELLING & SOFTWARE SOLUTION VIDEO DIRECTOR
 
 ## 1. VAI TRÒ
-Bạn là Biên tập viên Tin tức Công nghệ & Kinh doanh, chuyên theo dõi những diễn biến mới nhất có ảnh hưởng đến doanh nghiệp, startup, founder, CEO và ngành công nghệ.
-Bạn phụ trách sản xuất video bản tin ngắn hằng ngày cho **Nexo Studio** — đơn vị cung cấp dịch vụ thiết kế website và phát triển phần mềm giải pháp cho doanh nghiệp.
-Nhiệm vụ chính là giúp người xem cập nhật tin tức nhanh, hiểu chuyện gì đang xảy ra, vì sao nó đáng quan tâm và có thể ảnh hưởng thế nào đến hoạt động kinh doanh.
-Đây là kênh chia sẻ tin tức và góc nhìn chuyên môn, **không phải kênh quảng cáo dịch vụ hay tìm kiếm khách hàng trực tiếp**.
 
-## 2. DỮ LIỆU TIN TỨC MỚI NHẤT
-${newsText}
+Bạn là AI Creative Director, Video Scriptwriter, Motion Graphics Designer, UI/UX Designer và Remotion Developer.
 
-Hãy chọn **1 tin tức mới, đáng chú ý nhất** từ danh sách trên để đưa tin.
+Nhiệm vụ của bạn là biến một vấn đề thực tế trong kinh doanh thành video dọc ngắn 25–30 giây, cho thấy vấn đề, giải pháp công nghệ và kết quả mà người xem có thể hình dung được.
 
-## 3. CẤU TRÚC VIDEO — 35 ĐẾN 45 GIÂY
-Video có phong cách bản tin công nghệ hiện đại: nhanh, rõ, có chiều sâu, hình ảnh chuyên nghiệp và không mang cảm giác quảng cáo.
-- **Scene 1 — Hook / Tin đáng chú ý (0–4 giây):** Mở bằng sự kiện, thay đổi hoặc điểm bất ngờ quan trọng nhất. Tiêu đề mạnh nhưng phải chính xác.
-- **Scene 2 — Chuyện gì vừa xảy ra? (4–13 giây):** Truyền đạt sự kiện chính xác và dễ hiểu (Ai, vừa công bố/thay đổi điều gì, khi nào).
-- **Scene 3 — Chi tiết đáng chú ý (13–24 giây):** Số liệu được công bố, tính năng mới, quy mô thương vụ hoặc điểm khác biệt.
-- **Scene 4 — Tác động / Góc nhìn (24–35 giây):** Phân tích vì sao tin này quan trọng với doanh nghiệp, startup hoặc thị trường. Không biến mọi tin thành bài học đạo lý.
-- **Scene 5 — Kết thúc / Outro (35–45 giây):** Tóm tắt ý nghĩa lớn nhất, gợi mở góc nhìn. Outro thương hiệu tinh tế: "Theo dõi Nexo Studio để cập nhật tin mới". Không bắt buộc bán hàng.
+Video dành cho Nexo Studio — đơn vị thiết kế website, phát triển phần mềm và tự động hóa quy trình kinh doanh.
 
-## 4. PHONG CÁCH VIẾT VOICEOVER
-- Dùng tiếng Việt tự nhiên, rõ ràng, phong thái biên tập viên chuyên môn cao.
-- Không đọc lại nguyên văn chữ trên màn hình.
-- Độ dài: **khoảng 85–115 từ tiếng Việt**, đọc trọn vẹn trong 35–42 giây.
+Đối tượng xem:
+- Chủ cửa hàng và doanh nghiệp nhỏ.
+- Người kinh doanh online.
+- Trung tâm đào tạo và đơn vị cung cấp dịch vụ.
+- Doanh nghiệp đang quản lý công việc bằng Excel, Google Sheets, Zalo hoặc nhiều công cụ rời rạc.
+- Người muốn số hóa hoạt động kinh doanh nhưng chưa hiểu rõ về công nghệ.
 
-## 5. ĐỊNH DẠNG JSON ĐẦU RA BẮT BUỘC
-Chỉ xuất DUY NHẤT một JSON object hợp lệ, không có markdown code fence:
+**NGUYÊN TẮC QUAN TRỌNG NHẤT: SHOW, DON'T JUST TELL.**
+
+Không chỉ nói rằng một doanh nghiệp đang gặp vấn đề. Hãy mô phỏng vấn đề bằng hình ảnh.
+
+Không chỉ nói rằng phần mềm giúp tiết kiệm thời gian. Hãy cho người xem thấy quy trình trước và sau khi sử dụng phần mềm.
+
+Không chỉ hiển thị chữ “Tự động hóa”. Hãy tạo ra một luồng công việc tự động chạy trên màn hình.
+
+Không biến toàn bộ video thành các dòng chữ xuất hiện trên nền gradient.
+
+## 2. CHỌN Ý TƯỞNG VIDEO
+
+Dữ liệu tham khảo:
+${contextText}
+
+Chọn một vấn đề kinh doanh cụ thể và một giải pháp có thể giải thích bằng hình ảnh.
+
+Các nhóm chủ đề:
+- Website bán hàng và giới thiệu doanh nghiệp.
+- Quản lý khách hàng, đơn hàng và nhân viên.
+- Quản lý học viên, lịch học, đăng ký và học phí.
+- Tự động hóa các tác vụ lặp đi lặp lại.
+- Đồng bộ dữ liệu giữa website và các công cụ quản lý.
+- Những lỗi thường gặp khi quản lý bằng bảng tính hoặc tin nhắn.
+- Trải nghiệm khách hàng kém do quy trình thủ công.
+- Những ứng dụng công nghệ đơn giản giúp doanh nghiệp vận hành hiệu quả hơn.
+
+Ưu tiên những tình huống gần gũi, có thể hiểu ngay trong vài giây.
+
+Mỗi video chỉ tập trung vào một vấn đề chính, một giải pháp chính và một lợi ích quan trọng nhất.
+
+Không cố nhồi tất cả dịch vụ của Nexo Studio vào cùng một video.
+
+Không tự bịa số liệu, lời chứng thực, khách hàng, doanh thu, tỷ lệ chuyển đổi hoặc kết quả kinh doanh.
+
+Nếu dùng tình huống giả định để minh họa, hãy xem đó là mô phỏng, không trình bày như một case study có thật.
+
+## 3. THỜI LƯỢNG VÀ ĐỊNH DẠNG
+
+- Thời lượng: 28–35 giây.
+- Tỷ lệ: 9:16.
+- Độ phân giải: 1080 × 1920.
+- Ngôn ngữ: tiếng Việt tự nhiên, ngắn gọn, dễ hiểu.
+- Voiceover: khoảng 70–95 từ, điều chỉnh theo tốc độ đọc thực tế.
+- Nhịp dựng: nhanh, rõ ràng, có điểm nhấn.
+- Phong cách: hiện đại, trực quan, chuyên nghiệp nhưng gần gũi.
+- Mỗi cảnh phải đóng góp một chi tiết mới cho câu chuyện.
+
+## 4. BẮT BUỘC KỂ CHUYỆN BẰNG HÌNH ẢNH
+
+Mỗi video cần phối hợp ít nhất 3 loại hình ảnh khác nhau khi nội dung cho phép.
+
+Không dùng một kiểu animation cho toàn bộ video.
+
+### A. Mô phỏng tình huống thực tế
+Ví dụ khi nói về việc quản lý đơn hàng thủ công:
+- Tin nhắn khách hàng xuất hiện liên tục.
+- Chủ cửa hàng chuyển qua lại giữa nhiều cửa sổ.
+- Một đơn hàng bị bỏ sót hoặc thông tin khách hàng bị trùng.
+- Các thông báo chồng lên nhau để thể hiện sự quá tải.
+
+### B. Mô phỏng giao diện phần mềm
+Khi giới thiệu giải pháp, hãy tạo giao diện trực quan như:
+- Dashboard quản lý.
+- Danh sách khách hàng hoặc học viên.
+- Bảng đơn hàng và trạng thái xử lý.
+- Lịch học hoặc lịch làm việc.
+- Trang quản lý sản phẩm.
+- Form đăng ký trên website.
+- Bảng thống kê hoặc báo cáo.
+
+### C. Mô phỏng quy trình tự động hóa
+Ví dụ:
+- Khách gửi form → thông tin xuất hiện trong CRM → hệ thống tạo khách hàng mới → nhân viên nhận thông báo.
+- Khách đặt hàng → đơn hàng được ghi nhận → trạng thái được cập nhật → dashboard thay đổi.
+
+### D. Trước và sau khi dùng giải pháp
+Khi phù hợp, chia khung hình thành hai phần:
+**TRƯỚC:** Nhiều cửa sổ, thao tác thủ công, dữ liệu phân tán.
+**SAU:** Một giao diện tập trung, quy trình rõ ràng, thao tác ít hơn.
+
+### E. Biểu đồ và infographic
+Dùng khi cần giải thích số lượng bước, luồng dữ liệu hoặc sự khác biệt cũ vs mới.
+
+## 5. CẤU TRÚC PHÂN CẢNH
+- Cảnh 1 — Hook (0–4 giây): Tình huống trực quan gây chú ý. Headline ngắn, dễ đọc, tối đa 6–8 từ.
+- Cảnh 2 — Vấn đề (4–11 giây): Cho thấy vấn đề đang diễn ra và vì sao nó gây bất tiện.
+- Cảnh 3 — Giải pháp (11–20 giây): Đưa giải pháp vào bằng hình ảnh trực quan nhất video (Dashboard, workflow, form).
+- Cảnh 4 — Kết quả / Lợi ích (20–27 giây): Cho thấy trạng thái sau khi giải pháp được áp dụng.
+- Cảnh 5 — Kết thúc & CTA (27–34 giây): Thông điệp ngắn, dễ nhớ. Nhận diện Nexo Studio tinh tế.
+
+## 6. OUTPUT JSON
+
+Chỉ xuất JSON hợp lệ, không thêm Markdown code fence hoặc giải thích bên ngoài.
+Sử dụng cấu trúc:
 
 {
   "metadata": {
-    "categoryTag": "TECH NEWS",
-    "topicType": "NEWS",
-    "topic": "Tiêu đề ngắn gọn của sự kiện",
-    "eventDate": "Ngày sự kiện diễn ra",
-    "publishedAt": "Ngày đăng của nguồn chính",
-    "sourceName": "Tên nguồn (VD: TechCrunch, Reuters, VnExpress)",
-    "sourceUrl": "URL nguồn",
-    "additionalSources": [],
-    "verificationStatus": "VERIFIED",
-    "targetAudience": "Founder, CEO, startup và người quan tâm công nghệ",
-    "backgroundIndex": 0,
+    "topic": "Tên chủ đề ngắn gọn",
+    "industry": "Ngành nghề",
+    "targetAudience": "Chủ shop, Founder, Doanh nghiệp SME",
+    "problem": "Vấn đề cốt lõi",
+    "solution": "Giải pháp công nghệ",
     "aspectRatio": "9:16",
-    "totalDurationInSeconds": 38,
-    "hashtags": "#nexostudio #congnghe #tintuccongnghe #startup #kinhdoanh"
+    "width": 1080,
+    "height": 1920,
+    "targetDurationSeconds": 32,
+    "hashtags": ["#nexostudio", "#thietkewebsite", "#phanmemdoanhnghiep", "#chuyendoiso"]
   },
-  "hookScene": {
-    "durationInSeconds": 4,
-    "badge": "TIN CÔNG NGHỆ 24H",
-    "title": "Headline chính xác, tạo sự chú ý (3-8 từ)",
-    "highlightWord": "Cụm từ nằm chính xác trong title",
-    "voiceover": "Câu mở đầu trực tiếp vào sự kiện.",
-    "visualType": "TYPOGRAPHY",
-    "animationType": "SCALE_REVEAL"
+  "creativeDirection": {
+    "creativeConcept": "Mô phỏng quy trình thủ công sang tự động",
+    "visualStyle": "Modern Tech Dashboard & Workflow",
+    "colorPalette": ["#0B0F19", "#3B82F6", "#10B981", "#F59E0B"],
+    "cameraLanguage": "Push in, clean transitions",
+    "motionLanguage": "Spring animations, node connections",
+    "soundDesign": "Clear voiceover",
+    "storytellingApproach": "Problem -> Solution Demo -> Real Impact",
+    "avoid": ["Only text on gradient", "Fabricated testimonial"]
   },
+  "assets": [],
   "scenes": [
     {
-      "stepLabel": "DIỄN BIẾN",
-      "durationInSeconds": 9,
-      "icon": "📰",
-      "headline": "Sự kiện chính vừa diễn ra",
-      "bodyText": "Dữ kiện cốt lõi của tin tức (5-14 từ).",
-      "highlightWord": "Cụm từ có trong bodyText",
-      "voiceover": "Giải thích chuyện gì vừa xảy ra một cách dễ hiểu.",
-      "visualType": "NEWS_CARD",
-      "animationType": "SLIDE_REVEAL"
+      "id": "scene_01",
+      "startSeconds": 0,
+      "endSeconds": 4,
+      "durationSeconds": 4,
+      "purpose": "HOOK",
+      "voiceover": "Lời thoại hook ngắn gọn và gây tò mò.",
+      "visualType": "REAL_WORLD_SCENARIO",
+      "visualDescription": "Mô tả hình ảnh trực quan của hook",
+      "mainSubject": "Tình huống quá tải",
+      "textOverlays": [
+        {
+          "text": "Headline hook ngắn gọn (3-8 từ)",
+          "role": "HOOK",
+          "position": "TOP"
+        }
+      ]
     },
     {
-      "stepLabel": "CHI TIẾT",
-      "durationInSeconds": 11,
-      "icon": "🔍",
-      "headline": "Điểm mới đáng chú ý",
-      "bodyText": "Thông tin mới hoặc dữ kiện quan trọng.",
-      "highlightWord": "Cụm từ có trong bodyText",
-      "voiceover": "Phân tích dữ kiện và giải thích điểm đột phá.",
-      "visualType": "DATA_VISUAL",
-      "animationType": "STAGGER_REVEAL"
+      "id": "scene_02",
+      "startSeconds": 4,
+      "endSeconds": 11,
+      "durationSeconds": 7,
+      "purpose": "PROBLEM",
+      "voiceover": "Phân tích vì sao quy trình cũ làm mất khách và lãng phí giờ làm.",
+      "visualType": "BEFORE_AFTER",
+      "visualDescription": "Mô tả vấn đề cụ thể",
+      "mainSubject": "Thực trạng thủ công",
+      "textOverlays": [
+        {
+          "text": "Tiêu đề vấn đề thực tế",
+          "role": "PROBLEM",
+          "position": "TOP"
+        }
+      ]
     },
     {
-      "stepLabel": "TÁC ĐỘNG",
-      "durationInSeconds": 10,
-      "icon": "📊",
-      "headline": "Vì sao tin này quan trọng?",
-      "bodyText": "Tác động tiềm năng hoặc góc nhìn thực tế.",
-      "highlightWord": "Cụm từ có trong bodyText",
-      "voiceover": "Phân tích ý nghĩa với doanh nghiệp hoặc thị trường.",
-      "visualType": "EDITORIAL",
-      "animationType": "FADE_UP"
+      "id": "scene_03",
+      "startSeconds": 11,
+      "endSeconds": 20,
+      "durationSeconds": 9,
+      "purpose": "SOLUTION",
+      "voiceover": "Giải thích cách website và phần mềm tự động hóa xử lý trơn tru.",
+      "visualType": "UI_MOCKUP",
+      "visualDescription": "Mô tả giao diện dashboard quản trị tự động",
+      "mainSubject": "Phần mềm Nexo Studio",
+      "textOverlays": [
+        {
+          "text": "Tự động hóa với hệ thống quản trị riêng",
+          "role": "SOLUTION",
+          "position": "TOP"
+        }
+      ]
+    },
+    {
+      "id": "scene_04",
+      "startSeconds": 20,
+      "endSeconds": 27,
+      "durationSeconds": 7,
+      "purpose": "RESULT",
+      "voiceover": "Khắc họa hiệu quả thực tế: tiết kiệm thời gian, tăng trải nghiệm khách hàng.",
+      "visualType": "DATA_CHART",
+      "visualDescription": "Mô tả số liệu hoặc lợi ích thực tế",
+      "mainSubject": "Lợi ích đột phá",
+      "textOverlays": [
+        {
+          "text": "Cắt giảm thời gian thao tác thủ công",
+          "role": "RESULT",
+          "position": "TOP"
+        }
+      ]
+    },
+    {
+      "id": "scene_05",
+      "startSeconds": 27,
+      "endSeconds": 34,
+      "durationSeconds": 7,
+      "purpose": "CTA",
+      "voiceover": "Nhắn tin cho Nexo Studio ngay hôm nay để nhận giải pháp tối ưu cho doanh nghiệp.",
+      "visualType": "BRAND_OUTRO",
+      "visualDescription": "Nhận diện thương hiệu Nexo Studio và nút CTA",
+      "mainSubject": "Call To Action",
+      "textOverlays": [
+        {
+          "text": "Nhắn tin cho Nexo Studio ngay hôm nay",
+          "role": "CTA",
+          "position": "CENTER"
+        }
+      ]
     }
   ],
-  "ctaScene": {
-    "durationInSeconds": 6,
-    "mainCta": "Theo dõi Nexo Studio để cập nhật tin mới",
-    "offerSubtext": "Công nghệ, startup và kinh doanh — ngắn gọn, dễ hiểu",
-    "voiceover": "Câu kết súc tích, gợi mở và không quảng cáo dịch vụ trực tiếp.",
-    "visualType": "BRAND_OUTRO",
-    "animationType": "FADE_UP"
+  "voiceoverFullText": "Toàn bộ lời thoại ghép từ 5 scene theo thứ tự, khoảng 70-95 từ tiếng Việt, đọc vừa vặn trong 28-34 giây.",
+  "ending": {
+    "takeaway": "Giải pháp công nghệ phù hợp giúp doanh nghiệp vận hành trơn tru.",
+    "brandName": "Nexo Studio",
+    "cta": "Nhắn tin cho Nexo Studio để nhận tư vấn miễn phí"
   },
-  "voiceoverFullText": "Toàn bộ lời thoại của hookScene, các scenes theo đúng thứ tự và ctaScene, ghép thành một đoạn hoàn chỉnh (khoảng 85-115 từ tiếng Việt, đọc vừa vặn trong 35-42 giây).",
-  "editorialNote": "Giải thích ngắn vì sao tin này đáng chú ý."
+  "qualityChecks": {
+    "problemClearlyVisualized": true,
+    "solutionClearlyVisualized": true,
+    "beforeAfterContrast": true,
+    "multipleVisualTypesUsed": true,
+    "visualsBeyondText": true,
+    "noFabricatedResults": true,
+    "assetsAndFallbacksDefined": true,
+    "timelineValid": true,
+    "voiceoverTimingChecked": true,
+    "jsonValid": true
+  }
 }
 `;
 
   return await runGeminiGeneration(genAI, modelsToTry, prompt);
 }
 
-// ─── PROMPT 2: BÀI HỌC THỰC CHIẾN B2B & TỐI ƯU CHUYỂN ĐỔI (B2B LESSON & CRO) ──
-async function generateB2BLessonScript(newsItems) {
-  console.log("💡 [PROMPT BÀI HỌC B2B] Giám đốc Sáng tạo đang viết kịch bản bài học thực chiến CRO (30-45s)...");
+// ══════════════════════════════════════════════════════════════════════════════
+// PROMPT 2: NEXO STUDIO — AI DAILY NEWS VIDEO DIRECTOR
+// ══════════════════════════════════════════════════════════════════════════════
+async function generateDailyNewsScript(newsItems) {
+  console.log("📰 [PROMPT 2] Kích hoạt NEXO STUDIO — AI DAILY NEWS VIDEO DIRECTOR...");
 
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
   const modelsToTry = ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash"];
 
-  const newsText = newsItems
-    .map((n, i) => `${i + 1}. ${n.title}: ${n.text?.slice(0, 250) ?? ""}`)
-    .join("\n");
+  const newsText = newsItems && newsItems.length > 0
+    ? newsItems.map((n, i) => `${i + 1}. [${n.publishedDate || "Hôm nay"}] ${n.title}\nNguồn: ${n.url || "Nguồn tin cậy"}\nNội dung: ${n.text?.slice(0, 350) ?? ""}`).join("\n\n")
+    : "Tin tức công nghệ mới nhất về AI, startup và chuyển đổi số doanh nghiệp 2026.";
 
   const prompt = `
-Bạn là Giám đốc Sáng tạo Video B2B, chuyên gia Storytelling và tối ưu chuyển đổi (CRO) cho thương hiệu **Nexo Studio** — đơn vị thiết kế website chuyên nghiệp và phát triển phần mềm tự động hóa cho doanh nghiệp.
+# NEXO STUDIO — AI DAILY NEWS VIDEO DIRECTOR
 
-Dựa vào các diễn biến công nghệ sau:
+## 1. VAI TRÒ
+
+Bạn là một AI Video Director, Motion Graphics Designer, News Editor và Creative Technologist chuyên sản xuất video tin tức ngắn bằng Remotion (React).
+
+Nhiệm vụ của bạn là biến một tin tức thực tế về công nghệ, AI, startup, doanh nghiệp, sản phẩm số hoặc nhà sáng lập thành một video dọc 35–45 giây có hình ảnh phong phú, chuyển động đẹp, dễ hiểu và hấp dẫn.
+
+**NGUYÊN TẮC CỐT LÕI: VIDEO PHẢI KỂ CHUYỆN BẰNG HÌNH ẢNH, KHÔNG PHẢI CHỈ BẰNG CHỮ.**
+
+Không được tạo một video mà phần lớn thời lượng chỉ có headline, subtitle, text animation và background gradient.
+
+Mỗi cảnh phải có một ý tưởng hình ảnh cụ thể giúp người xem hiểu tin tức ngay cả khi chưa đọc hết chữ.
+
+## 2. TÌM VÀ XÁC MINH TIN TỨC
+
+Dữ liệu tin tức mới nhất từ hệ thống tìm kiếm:
 ${newsText}
 
-Hãy chọn **1 bài học thực chiến hoặc vấn đề âm thầm khiến doanh nghiệp mất khách/lãng phí chi phí** dành cho CEO, Founder và quản lý. Liên kết tự nhiên đến giải pháp Website hoặc Phần mềm tự động hóa của Nexo Studio.
+Chọn một tin tức mới, đáng chú ý, có giá trị với người xem Việt Nam.
+Các nhóm chủ đề:
+- AI, công nghệ và sản phẩm mới.
+- Startup, nhà sáng lập, gọi vốn và mô hình kinh doanh.
+- Chiến lược, thay đổi hoặc sự kiện đáng chú ý của các doanh nghiệp.
+- Phần mềm, SaaS, thương mại điện tử và xu hướng chuyển đổi số.
+- Những ứng dụng công nghệ đang thay đổi cách doanh nghiệp vận hành.
 
-Thời lượng mục tiêu: **30 ĐẾN 45 GIÂY**.
-Tổng lời thoại: **khoảng 95–130 từ tiếng Việt**, tự nhiên, dứt khoát, chuyên gia chia sẻ kinh nghiệm.
-TUYỆT ĐỐI KHÔNG ghi chữ "Luận điểm 1", "Luận điểm 2", "Ý 1".
+Yêu cầu:
+- Ưu tiên nguồn chính thức, báo chí uy tín và thông báo từ doanh nghiệp.
+- Kiểm tra ngày đăng bài và ngày sự kiện thực tế.
+- Không tự bịa số liệu, phát ngôn, kết quả kinh doanh hoặc chi tiết sản phẩm.
+- Lưu URL nguồn để hiển thị hoặc dẫn nguồn trong video.
 
-Định dạng JSON bắt buộc:
+## 3. THỜI LƯỢNG VÀ ĐỊNH DẠNG
+
+- Thời lượng mục tiêu: 35–45 giây.
+- Tỷ lệ: 9:16 (1080 × 1920).
+- Ngôn ngữ: tiếng Việt tự nhiên, dễ hiểu, không dịch máy.
+- Giọng đọc: rõ ràng, có nhịp, như một kênh tin công nghệ hiện đại.
+- Voiceover mục tiêu: khoảng 85–115 từ, điều chỉnh theo tốc độ giọng đọc thực tế.
+- Tốc độ hình ảnh đủ nhanh để giữ sự chú ý nhưng không làm người xem bị quá tải.
+
+## 4. BẮT BUỘC ĐA DẠNG HÌNH ẢNH
+
+- Ảnh thật, footage hoặc card tin tức chính thức (NEWS_INTRO, NEWS_CARD).
+- Mô phỏng giao diện sản phẩm (PRODUCT_DEMO, UI_MOCKUP, DASHBOARD).
+- Biểu đồ và dữ liệu động (DATA_CHART, HERO_STAT).
+- Sơ đồ giải thích công nghệ / AI (WORKFLOW_DIAGRAM).
+- Outro thương hiệu Nexo Studio tinh tế (BRAND_OUTRO).
+
+## 5. CẤU TRÚC KỂ CHUYỆN 35–45 GIÂY
+
+- Cảnh 1 — Hook (0–4 giây): Mở đầu bằng hình ảnh mạnh liên quan trực tiếp đến tin tức. Tiêu đề ngắn, dễ đọc.
+- Cảnh 2 — Sự kiện chính (4–13 giây): Cho người xem thấy sự kiện thực sự là gì. Hiển thị nguồn tin và thời điểm.
+- Cảnh 3 — Chi tiết đáng chú ý (13–24 giây): Minh họa tính năng, sản phẩm, số liệu hoặc cách công nghệ hoạt động.
+- Cảnh 4 — Tác động (24–35 giây): Giải thích tin tức có ý nghĩa gì với người dùng hoặc doanh nghiệp.
+- Cảnh 5 — Kết luận (35–42 giây): Kết thúc bằng một nhận định ngắn, có giá trị. Outro Nexo Studio tinh tế.
+
+## 6. OUTPUT JSON
+
+Chỉ trả về JSON hợp lệ, không thêm Markdown fence hoặc giải thích bên ngoài.
+Sử dụng cấu trúc:
+
 {
   "metadata": {
-    "categoryTag": "TỐI ƯU VẬN HÀNH",
-    "topicType": "PRACTICAL_LESSON",
-    "topic": "Chủ đề bài học kinh doanh",
-    "sourceUrl": "",
-    "publishedAt": "",
-    "targetAudience": "CEO, Founder, chủ doanh nghiệp và quản lý",
-    "businessGoal": "Tăng nhận diện chuyên môn và tạo khách hàng tiềm năng",
-    "backgroundIndex": 0,
+    "topic": "Tiêu đề ngắn gọn của sự kiện",
+    "category": "TECH NEWS",
+    "eventDate": "Ngày sự kiện diễn ra",
+    "publishedAt": "Ngày đăng của nguồn chính",
+    "sourceName": "Tên nguồn chính (VD: TechCrunch, Reuters, VnExpress)",
+    "sourceUrl": "URL nguồn chính đã xác minh",
+    "additionalSources": [],
+    "verificationStatus": "VERIFIED",
+    "targetAudience": "Người quan tâm công nghệ và kinh doanh tại Việt Nam",
     "aspectRatio": "9:16",
-    "totalDurationInSeconds": 38,
-    "hashtags": "#nexostudio #thietkewebsite #phanmemdoanhnghiep #chuyendoiso #congnghe2026"
+    "width": 1080,
+    "height": 1920,
+    "targetDurationSeconds": 40,
+    "hashtags": ["#nexostudio", "#congnghe", "#tintuccongnghe", "#startup", "#kinhdoanh"]
   },
-  "hookScene": {
-    "durationInSeconds": 4,
-    "badge": "BÀI HỌC KINH DOANH",
-    "title": "Headline gây chú ý đánh trúng nỗi đau (3-8 từ)",
-    "highlightWord": "Cụm từ nằm chính xác trong title",
-    "voiceover": "Lời mở đầu ngắn, tự nhiên và gây tò mò.",
-    "visualType": "TYPOGRAPHY",
-    "animationType": "SCALE_REVEAL"
+  "creativeDirection": {
+    "visualConcept": "Editorial Tech News with dynamic mockups and data visuals",
+    "visualStyle": "Modern Tech Editorial",
+    "colorPalette": ["#0B0F19", "#2563EB", "#10B981", "#38BDF8"],
+    "cameraLanguage": "Dynamic push-in & parallax",
+    "motionLanguage": "Clean spring reveals and data counters",
+    "soundDesign": "Professional news anchor tone",
+    "visualVarietyPlan": "News Card -> Product Demo -> Data Visual -> Impact Diagram -> Outro",
+    "avoid": ["Text only video", "Unverified claims"]
   },
+  "assets": [],
   "scenes": [
     {
-      "stepLabel": "THỰC TRẠNG",
-      "durationInSeconds": 9,
-      "icon": "📉",
-      "headline": "Điểm nghẽn thực tế",
-      "bodyText": "Mô tả nguyên nhân gốc rễ (5-14 từ).",
-      "highlightWord": "Cụm từ có trong bodyText",
-      "voiceover": "Phân tích vì sao quy trình cũ làm thất thoát khách hàng hoặc chi phí.",
-      "visualType": "STATEMENT",
-      "animationType": "STAGGER_REVEAL"
+      "id": "scene_01",
+      "startSeconds": 0,
+      "endSeconds": 4,
+      "durationSeconds": 4,
+      "purpose": "HOOK",
+      "voiceover": "Câu mở đầu trực tiếp vào sự kiện gây tò mò.",
+      "visualType": "NEWS_INTRO",
+      "visualDescription": "Card tiêu điểm tin tức công nghệ",
+      "mainSubject": "Sự kiện công nghệ",
+      "textOverlays": [
+        {
+          "text": "Headline chính xác, tạo sự chú ý (3-8 từ)",
+          "role": "HEADLINE",
+          "position": "TOP"
+        }
+      ]
     },
     {
-      "stepLabel": "GIẢI PHÁP",
-      "durationInSeconds": 10,
-      "icon": "⚙️",
-      "headline": "Giải pháp công nghệ Nexo Studio",
-      "bodyText": "Cách Website hoặc Phần mềm tự động hóa xử lý bài toán trên.",
-      "highlightWord": "Cụm từ có trong bodyText",
-      "voiceover": "Giải thích giải pháp công nghệ vận hành như thế nào.",
+      "id": "scene_02",
+      "startSeconds": 4,
+      "endSeconds": 13,
+      "durationSeconds": 9,
+      "purpose": "MAIN_EVENT",
+      "voiceover": "Giải thích chuyện gì vừa xảy ra một cách ngắn gọn, dễ hiểu.",
       "visualType": "UI_MOCKUP",
-      "animationType": "SLIDE_REVEAL"
+      "visualDescription": "Mô phỏng sản phẩm hoặc giao diện công nghệ",
+      "mainSubject": "Diễn biến sự kiện",
+      "textOverlays": [
+        {
+          "text": "Diễn biến sự kiện chính vừa công bố",
+          "role": "HEADLINE",
+          "position": "TOP"
+        }
+      ]
     },
     {
-      "stepLabel": "KẾT QUẢ",
-      "durationInSeconds": 9,
-      "icon": "📈",
-      "statHighlight": "GIÁ TRỊ CỐT LÕI (VD: CẮT GIẢM 70% THỜI GIAN)",
-      "headline": "Lợi ích đột phá đo lường được",
-      "bodyText": "Kết quả thực tế cho doanh nghiệp.",
-      "highlightWord": "Cụm từ có trong bodyText",
-      "voiceover": "Khắc họa lợi ích kinh doanh và góc nhìn chiến lược.",
-      "visualType": "HERO_STAT",
-      "animationType": "COUNT_UP"
+      "id": "scene_03",
+      "startSeconds": 13,
+      "endSeconds": 24,
+      "durationSeconds": 11,
+      "purpose": "DETAILS",
+      "voiceover": "Phân tích dữ kiện quan trọng và tính năng đột phá của sản phẩm.",
+      "visualType": "DATA_CHART",
+      "visualDescription": "Biểu đồ so sánh số liệu thực tế",
+      "mainSubject": "Chi tiết công nghệ",
+      "textOverlays": [
+        {
+          "text": "Điểm đột phá khiến sự kiện đáng chú ý",
+          "role": "HEADLINE",
+          "position": "TOP"
+        }
+      ]
+    },
+    {
+      "id": "scene_04",
+      "startSeconds": 24,
+      "endSeconds": 35,
+      "durationSeconds": 11,
+      "purpose": "IMPACT",
+      "voiceover": "Phân tích ý nghĩa và tác động trực tiếp đến doanh nghiệp hoặc thị trường.",
+      "visualType": "WORKFLOW_DIAGRAM",
+      "visualDescription": "Sơ đồ tác động chuyển đổi số",
+      "mainSubject": "Tác động thị trường",
+      "textOverlays": [
+        {
+          "text": "Tác động đến doanh nghiệp và thị trường",
+          "role": "HEADLINE",
+          "position": "TOP"
+        }
+      ]
+    },
+    {
+      "id": "scene_05",
+      "startSeconds": 35,
+      "endSeconds": 41,
+      "durationSeconds": 6,
+      "purpose": "CONCLUSION",
+      "voiceover": "Theo dõi Nexo Studio để cập nhật những diễn biến công nghệ mới nhất mỗi ngày.",
+      "visualType": "BRAND_OUTRO",
+      "visualDescription": "Outro thương hiệu Nexo Studio Tech News",
+      "mainSubject": "Brand Outro",
+      "textOverlays": [
+        {
+          "text": "Theo dõi Nexo Studio để cập nhật tin mới",
+          "role": "CTA",
+          "position": "CENTER"
+        }
+      ]
     }
   ],
-  "ctaScene": {
-    "durationInSeconds": 6,
-    "mainCta": "Nhắn tin cho Nexo Studio",
-    "offerSubtext": "Nhận tư vấn giải pháp phù hợp với quy trình doanh nghiệp",
-    "voiceover": "Câu kết tự nhiên, tin cậy và thúc đẩy người xem nhắn tin.",
-    "visualType": "BRAND_CTA",
-    "animationType": "FADE_UP"
+  "voiceoverFullText": "Toàn bộ lời thoại của 5 scenes ghép thành đoạn hoàn chỉnh, khoảng 85-115 từ tiếng Việt, đọc trong 35-42 giây.",
+  "ending": {
+    "takeaway": "Ý nghĩa lớn nhất của sự kiện.",
+    "engagementQuestion": "Bạn nghĩ gì về xu hướng này?",
+    "brandName": "Nexo Studio",
+    "cta": "Theo dõi Nexo Studio để cập nhật tin công nghệ và kinh doanh"
   },
-  "voiceoverFullText": "Toàn bộ lời thoại của hookScene, scenes và ctaScene ghép thành một đoạn hoàn chỉnh (khoảng 95-130 từ tiếng Việt, đọc trong 35-42 giây)."
+  "qualityChecks": {
+    "newsVerified": true,
+    "sourceUrlsPresent": true,
+    "visualsBeyondText": true,
+    "multipleVisualTypesUsed": true,
+    "visualsRelevantToStory": true,
+    "statisticsVerified": true,
+    "assetRightsReviewed": true,
+    "sceneTimingValid": true,
+    "voiceoverTimingChecked": true,
+    "fallbacksProvided": true
+  }
 }
 `;
 
   return await runGeminiGeneration(genAI, modelsToTry, prompt);
 }
 
-// Hàm dùng chung gọi Gemini với cơ chế thử lại nhiều model
+// ─── Gọi Gemini AI với cơ chế retry an toàn ──────────────────────────────────
 async function runGeminiGeneration(genAI, modelsToTry, prompt) {
   let lastError;
   for (const modelName of modelsToTry) {
@@ -304,8 +560,8 @@ async function runGeminiGeneration(genAI, modelsToTry, prompt) {
         const result = await model.generateContent(prompt);
         const text = result.response.text().replace(/```json|```/g, "").trim();
         const script = JSON.parse(text);
-        const titleText = script.hookScene?.title || script.title || "Video Nexo Studio";
-        console.log(`✅ Kịch bản thành công từ [${modelName}]: "${titleText}"`);
+        const titleText = script.metadata?.topic || script.scenes?.[0]?.textOverlays?.[0]?.text || "Kịch bản Nexo Studio";
+        console.log(`✅ AI viết kịch bản thành công từ [${modelName}]: "${titleText}"`);
         return script;
       } catch (err) {
         lastError = err;
@@ -333,7 +589,6 @@ async function generateVoice(voiceScript) {
   let subtitles = [];
 
   try {
-    // Edge-TTS tạo audio và xuất mốc thời gian từng từ cho Karaoke
     execSync(`python scripts/tts.py "${tempTextPath}" "${publicAudioPath}" "${publicSubPath}"`, {
       cwd: ROOT,
       stdio: "inherit",
@@ -359,34 +614,45 @@ async function generateVoice(voiceScript) {
   return { audioPath: "voice.mp3", subtitles };
 }
 
-// ─── Bước 4: Render Remotion video (Thời lượng linh động 35s - 45s) ────────────
+// ─── Bước 4: Render Remotion video từ Props động do AI sinh ra ────────────────
 async function renderVideo(script, voiceData) {
   console.log("🎬 Đang render video Remotion...");
 
   const { audioPath, subtitles } = voiceData;
 
-  // Tính toán thời lượng video khớp chuẩn với độ dài giọng nói + 2.0 giây đệm
-  let durationInSeconds = script.metadata?.totalDurationInSeconds || 38;
+  // Thời lượng video khớp chuẩn với độ dài giọng nói + 2.0 giây đệm
+  let durationInSeconds = script.metadata?.targetDurationSeconds || 36;
   if (subtitles && subtitles.length > 0) {
     const lastWord = subtitles[subtitles.length - 1];
-    durationInSeconds = Math.max(30, Math.min(45, Math.ceil(lastWord.end + 2.0)));
+    durationInSeconds = Math.max(28, Math.min(45, Math.ceil(lastWord.end + 2.0)));
   }
 
   const durationInFrames = durationInSeconds * 30; // 30fps
-  console.log(`⏱️ Thời lượng video: ${durationInSeconds} giây (${durationInFrames} frames)`);
+  console.log(`⏱️ Thời lượng video thực tế: ${durationInSeconds} giây (${durationInFrames} frames)`);
 
   const propsObj = {
     metadata: script.metadata,
-    hookScene: script.hookScene,
-    scenes: script.scenes,
-    ctaScene: script.ctaScene,
-    // Tương thích ngược
-    title: script.hookScene?.title || script.title,
-    slides: script.scenes,
-    cta: script.ctaScene?.mainCta || script.cta,
+    creativeDirection: script.creativeDirection,
+    scenes: (script.scenes || []).map((s) => ({
+      id: s.id,
+      stepLabel: s.purpose,
+      durationInSeconds: s.durationSeconds,
+      headline: s.textOverlays?.[0]?.text || s.mainSubject || "",
+      bodyText: s.visualDescription || s.voiceover || "",
+      icon: s.visualType?.includes("MOCKUP") ? "💻" : s.visualType?.includes("WORKFLOW") ? "⚡" : s.visualType?.includes("CHART") ? "📈" : s.visualType?.includes("BEFORE") ? "⚖️" : "📰",
+      visualType: s.visualType,
+      voiceover: s.voiceover,
+    })),
+    ending: script.ending,
+    hookScene: {
+      title: script.scenes?.[0]?.textOverlays?.[0]?.text || script.metadata?.topic || "Nexo Studio",
+      badge: script.metadata?.category || "NEXO STUDIO",
+    },
+    ctaScene: {
+      mainCta: script.ending?.cta || "Nhắn tin cho Nexo Studio",
+      offerSubtext: script.ending?.takeaway || "Thiết Kế Website Chuẩn UX/UI • Phần Mềm Tự Động Hóa",
+    },
     audioUrl: audioPath,
-    backgroundIndex: script.metadata?.backgroundIndex ?? 0,
-    hashtags: script.metadata?.hashtags || script.hashtags,
     subtitles: subtitles,
     durationInFrames: durationInFrames,
   };
@@ -411,7 +677,6 @@ async function uploadToDrive(videoPath) {
   const tag = `v${Date.now()}`;
 
   try {
-    // Đẩy release lên chính repo video-automation (Public)
     execSync(
       `gh release create "${tag}" "${videoPath}#video.mp4" --title "Daily Video ${new Date().toISOString().slice(0, 10)}" --notes "Automated daily video" --repo chithong2k2/video-automation`,
       { stdio: "inherit" }
@@ -425,13 +690,14 @@ async function uploadToDrive(videoPath) {
   }
 }
 
-// ─── Bước 6: Trigger Activepieces webhook ────────────────────────────────────
+// ─── Bước 6: Trigger Activepieces webhook đăng lên Facebook ───────────────────
 async function triggerWebhook(videoUrl, script) {
   console.log("🔔 Đang gửi đến Activepieces...");
 
-  const postTitle = script.hookScene?.title || script.title || "Video Nexo Studio";
-  const postCta = script.ctaScene?.mainCta || script.cta || "Theo dõi Nexo Studio";
-  const postHashtags = script.metadata?.hashtags || script.hashtags || "#nexostudio #congnghe";
+  const postTitle = script.metadata?.topic || script.scenes?.[0]?.textOverlays?.[0]?.text || "Video Nexo Studio";
+  const postCta = script.ending?.cta || "Theo dõi Nexo Studio";
+  const rawHashtags = script.metadata?.hashtags || ["#nexostudio", "#congnghe"];
+  const postHashtags = Array.isArray(rawHashtags) ? rawHashtags.join(" ") : rawHashtags;
 
   await axios.post(ACTIVEPIECES_WEBHOOK_URL, {
     videoUrl,
@@ -444,20 +710,18 @@ async function triggerWebhook(videoUrl, script) {
   console.log("✅ Webhook triggered!");
 }
 
-// ─── Main Dispatcher: 4 Tin Tức + 2 Bài Học B2B Mỗi Ngày ─────────────────────
+// ─── Main Dispatcher ──────────────────────────────────────────────────────────
 async function main() {
   console.log("🚀 Bắt đầu pipeline Nexo Studio Multi-Format Video Automation...\n");
 
-  // Kiểm tra tham số dòng lệnh: --type=news hoặc --type=lesson hoặc auto
   const args = process.argv.slice(2);
   const typeArg = args.find((a) => a.startsWith("--type="))?.split("=")[1] || "auto";
 
   let videoType = typeArg;
 
   if (videoType === "auto") {
-    // Tự động chọn theo giờ Việt Nam (UTC + 7):
-    // 07:00, 13:00, 16:00, 20:00 VN -> NEWS (4 video tin tức/ngày)
-    // 10:00, 18:00 VN -> LESSON (2 video bài học B2B/ngày)
+    // 07:00, 13:00, 16:00, 20:30 VN -> NEWS (4 video tin tức/ngày)
+    // 10:00, 18:30 VN -> LESSON (2 video bài học B2B/ngày)
     const nowUtcHours = new Date().getUTCHours();
     const vnHours = (nowUtcHours + 7) % 24;
 
@@ -466,13 +730,13 @@ async function main() {
     if (vnHours >= 9 && vnHours <= 11) {
       videoType = "lesson"; // 10h sáng: Bài học B2B trưa
     } else if (vnHours >= 17 && vnHours <= 19) {
-      videoType = "lesson"; // 18h tối: Bài học B2B tan sở
+      videoType = "lesson"; // 18h30 tối: Bài học B2B tan sở
     } else {
       videoType = "news"; // 07h, 13h, 16h, 20h: Bản tin công nghệ
     }
   }
 
-  console.log(`📌 Định dạng video được chọn: [${videoType.toUpperCase()}]`);
+  console.log(`📌 Kịch bản được chọn: [${videoType === "news" ? "DAILY TECH NEWS" : "STORYTELLING & SOFTWARE SOLUTION"}]`);
 
   try {
     const searchQuery =
@@ -486,20 +750,12 @@ async function main() {
     if (videoType === "news") {
       script = await generateDailyNewsScript(news);
     } else {
-      script = await generateB2BLessonScript(news);
+      script = await generateStorytellingScript(news);
     }
 
-    // Lấy lời thoại từ voiceoverFullText hoặc ghép từ các phân cảnh
     const voiceText =
       script.voiceoverFullText ||
-      [
-        script.hookScene?.voiceover,
-        ...(script.scenes || []).map((s) => s.voiceover),
-        script.ctaScene?.voiceover,
-      ]
-        .filter(Boolean)
-        .join(" ") ||
-      script.voiceScript;
+      (script.scenes || []).map((s) => s.voiceover).filter(Boolean).join(" ");
 
     console.log(`📝 Tổng số từ lời thoại: ${voiceText.split(/\s+/).length} từ`);
 
