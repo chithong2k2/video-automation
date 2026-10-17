@@ -5,4 +5,7 @@ out/
 /tmp/
 __pycache__/
 *.pyc
+public/*.mp3
+public/*.json
+
 
