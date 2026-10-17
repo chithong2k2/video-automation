@@ -2,8 +2,24 @@ name: Daily Video Pipeline
 
 on:
   schedule:
-    - cron: "0 2 * * *"  # Chạy 9:00 sáng giờ VN (UTC+7 = UTC 02:00)
-  workflow_dispatch:       # Cho phép chạy tay từ GitHub UI
+    # 4 Video Tin Tức + 2 Video Bài Học B2B chia đều trong ngày (Giờ Việt Nam = UTC + 7)
+    - cron: "0 0 * * *"    # 07:00 Sáng VN -> Bản tin công nghệ & kinh doanh 1
+    - cron: "0 3 * * *"    # 10:00 Sáng VN -> Bài học thực chiến B2B 1
+    - cron: "0 6 * * *"    # 13:00 Chiều VN -> Bản tin công nghệ & kinh doanh 2
+    - cron: "0 9 * * *"    # 16:00 Chiều VN -> Bản tin công nghệ & kinh doanh 3
+    - cron: "30 11 * * *"  # 18:30 Tối VN -> Bài học thực chiến B2B 2
+    - cron: "30 13 * * *"  # 20:30 Tối VN -> Bản tin công nghệ & kinh doanh 4
+  workflow_dispatch:
+    inputs:
+      type:
+        description: "Chọn định dạng video cần tạo"
+        required: true
+        default: "auto"
+        type: choice
+        options:
+          - auto
+          - news
+          - lesson
 
 jobs:
   generate-and-post:
@@ -22,7 +38,7 @@ jobs:
         with:
           node-version: "22"
 
-      # Remotion cần Chrome để render
+      # Remotion cần Chrome & phông chữ để render sắc nét
       - name: Install Chrome dependencies
         run: |
           sudo apt-get update
@@ -41,9 +57,9 @@ jobs:
           EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
           ACTIVEPIECES_WEBHOOK_URL: ${{ secrets.ACTIVEPIECES_WEBHOOK_URL }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/pipeline.mjs
+        run: node scripts/pipeline.mjs --type=${{ inputs.type || 'auto' }}
 
-      # Giữ video như artifact phòng khi cần debug
+      # Giữ video như artifact phòng khi cần xem lại
       - name: Upload video artifact
         if: always()
         uses: actions/upload-artifact@v4

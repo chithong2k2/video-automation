@@ -6,7 +6,7 @@
     "start": "npx remotion studio",
     "render": "node scripts/render-video.mjs",
     "pipeline": "node scripts/pipeline.mjs",
-    "build": "npx remotion render"
+    "build": "remotion render src/index.ts VideoTemplate out/test.mp4"
   },
   "dependencies": {
     "@remotion/cli": "^4.0.0",

@@ -3,3 +3,6 @@ out/
 .env
 *.json.key
 /tmp/
+__pycache__/
+*.pyc
+
