@@ -53,8 +53,8 @@ async function generateScript(newsItems) {
   console.log("🤖 Gemini đang viết script video...");
 
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-  // Dùng model mới nhất được hỗ trợ
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  // Dùng model mới nhất được khuyến nghị bởi Google
+  const model = genAI.getGenerativeModel({ model: "gemini-3.8-flash" });
 
   const newsText = newsItems
     .map((n, i) => `${i + 1}. ${n.title}: ${n.text?.slice(0, 200) ?? ""}`)
