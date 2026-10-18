@@ -156,7 +156,7 @@ async function addVoice(script) {
     scenes[i].words = words;
     scenes[i].seconds = Math.max(
       Number(scenes[i].seconds) || 4,
-      Number((dur + 0.5).toFixed(2))
+      Number((dur + (i === scenes.length - 1 ? 0.6 : 0.3)).toFixed(2))
     );
     console.log(`→ ${dur.toFixed(2)}s, ${words.length} từ`);
     made++;
@@ -277,7 +277,18 @@ const save = (script, file = "out/freeform-script.json") => {
     const jsonPath = save(script, flag("json", "out/freeform-script.json"));
 
     const total = (script.scenes || []).reduce((n, s) => n + (s.seconds || 4), 0);
-    console.log(`📊 Tổng thời lượng: ${total.toFixed(1)}s · ${script.scenes.length} cảnh`);
+    const words = (script.scenes || []).reduce(
+      (n, s) => n + String(s.voiceover || "").trim().split(/\s+/).filter(Boolean).length,
+      0
+    );
+    console.log(
+      `📊 Tổng thời lượng: ${total.toFixed(1)}s · ${script.scenes.length} cảnh · ${words} từ`
+    );
+    if (total > 46) {
+      console.warn(
+        `⚠️ Video ${total.toFixed(1)}s — vượt mốc 45s (${words} từ). Giảm lời thoại hoặc bớt cảnh.`
+      );
+    }
 
     if (args.includes("--dry-run")) {
       console.log("🧪 Dry run — không render, không đăng.");

@@ -163,7 +163,7 @@ Dùng khi tin có một cột mốc long trọng (giấy phép, chứng nhận, 
 
 Mỗi cảnh có thêm trường "voiceover": câu tiếng Việt sẽ được đọc thành tiếng.
 
-- 12–22 từ mỗi câu. Đọc tự nhiên, như đang nói với người xem, không như đọc báo.
+- 14–20 từ mỗi câu. Đọc tự nhiên, như đang nói với người xem, không như đọc báo.
 - Câu này KHÔNG hiện trên hình. Chữ trên hình (headline, title, label) viết ngắn;
   voiceover mới là câu nói đầy đủ.
 - Đừng lặp lại y nguyên chữ trên hình. Hình và lời phải bổ sung cho nhau.
@@ -173,7 +173,8 @@ Mỗi cảnh có thêm trường "voiceover": câu tiếng Việt sẽ được 
 - Tổng độ dài lời thoại quyết định độ dài video. Video sẽ tự dài ra nếu lời dài hơn
   "seconds" khai báo — nên đừng viết quá dài.
 - Giọng đọc tiếng Việt chạy khoảng 4 từ/giây. Để video rơi vào 35–45 giây, TỔNG số từ
-  của tất cả "voiceover" phải nằm trong khoảng 140–170 từ. Đếm lại trước khi trả JSON.
+  của tất cả "voiceover" phải nằm trong khoảng 140–160 từ. Đếm lại trước khi trả JSON.
+  Đây là ràng buộc CỨNG: 160 từ là trần, vượt là video quá dài.
 
 Ví dụ một cảnh có đủ:
 { "type":"grid", "seconds":7, "voiceover":"Mỗi lần chạy, chỉ hai mươi ba tỷ tham số được đánh thức. Chưa tới năm phần trăm bộ não đó thực sự hoạt động.",
@@ -211,8 +212,8 @@ ${FREE_PRIMITIVES}
 
 ## LUẬT VIẾT KỊCH BẢN
 1. Chọn ĐÚNG MỘT tin làm chủ đề. Không gộp nhiều tin rời rạc.
-2. Cấu trúc bắt buộc: cover (hook) → 4-7 cảnh thân → outro. Tổng 8-11 cảnh.
-3. Tổng thời lượng 35-55 giây (tổng các "seconds").
+2. Cấu trúc bắt buộc: cover (hook) → 5-6 cảnh thân → outro. Tổng 7-8 cảnh.
+3. Tổng thời lượng 35-45 giây. Cộng các "seconds" lại phải rơi vào khoảng này.
 4. Dùng ÍT NHẤT 4 loại primitive khác nhau. Không dùng 3 cảnh "bars" liên tiếp.
 5. Chỉ dùng primitive có trong danh sách trên. Không bịa type mới.
 6. "accent" phải là một từ CÓ THẬT trong "title", nguyên văn.
@@ -220,7 +221,8 @@ ${FREE_PRIMITIVES}
 8. Nếu tin không có số liệu thì KHÔNG dùng "stat"/"bars"/"versus" — dùng cover/compare/steps/quote.
 9. "note"/"source" phải ghi nguồn thật lấy từ tin đầu vào.
 10. Giọng văn: thẳng, cụ thể, không giật tít rỗng. Tiếng Việt có dấu đầy đủ.
-11. Không viết lời thoại. Chỉ có chữ hiển thị trên hình.
+11. MỌI cảnh đều PHẢI có "voiceover" — đó là lời đọc thành tiếng. Chữ hiển thị trên
+    hình (title, headline, label) thì viết ngắn, khác với lời đọc.
 
 ## ĐỊNH DẠNG ĐẦU RA
 Chỉ trả về JSON hợp lệ, không markdown, không giải thích:
