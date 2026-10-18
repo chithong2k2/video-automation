@@ -119,6 +119,16 @@ async function writeScript(newsItems) {
           )}], nhưng chỉ có ${used}. Video vẫn render nhưng sẽ giống video cũ.`
         );
       }
+
+      const tally = script.scenes.reduce((m, s) => ((m[s.type] = (m[s.type] || 0) + 1), m), {});
+      const overused = Object.entries(tally).filter(([t, n]) => n >= 3 && t !== "canvas");
+      if (overused.length) {
+        console.warn(
+          `⚠️ Lặp cảnh trong cùng video: ${overused
+            .map(([t, n]) => `${t}×${n}`)
+            .join(", ")} — sẽ trông đơn điệu.`
+        );
+      }
       return script;
     } catch (e) {
       console.warn(`⚠️ [${name}] ${e.message}`);

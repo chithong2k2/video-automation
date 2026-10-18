@@ -89,7 +89,9 @@ ${dir.brief}
 
 - Phải có ÍT NHẤT ${dir.need} cảnh thuộc nhóm này: ${dir.spine
     .map((s) => `"${s}"`)
-    .join(", ")}${avoid}${recent}`;
+    .join(", ")}
+- Trong nhóm đó phải dùng ÍT NHẤT 2 loại KHÁC NHAU. Không lặp một loại quá 2 lần
+  trong cùng video — 3 cảnh "grid" liền nhau là lỗi.${avoid}${recent}`;
 };
 
 export const FREE_PRIMITIVES = `
@@ -316,6 +318,9 @@ ${direction ? directionBlock(direction, recentTypes) : ""}
 10. Giọng văn: thẳng, cụ thể, không giật tít rỗng. Tiếng Việt có dấu đầy đủ.
 11. MỌI cảnh đều PHẢI có "voiceover" — đó là lời đọc thành tiếng. Chữ hiển thị trên
     hình (title, headline, label) thì viết ngắn, khác với lời đọc.
+12. Mỗi video PHẢI có ÍT NHẤT 1 cảnh "canvas" — đó là chỗ duy nhất bạn tự đặt toạ độ,
+    tự vẽ hình riêng cho đúng tin này. Đừng bỏ qua: không có canvas là video thành
+    khuôn đúc sẵn.
 
 ## ĐỊNH DẠNG ĐẦU RA
 Chỉ trả về JSON hợp lệ, không markdown, không giải thích:
