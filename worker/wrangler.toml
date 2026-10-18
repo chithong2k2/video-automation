@@ -1,0 +1,18 @@
+name = "video-automation-cron"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# Cloudflare cron chạy mỗi 5 phút (288 lần/ngày, free tier thoải mái).
+# Worker tự quyết định có bắn workflow hay không dựa trên giờ Việt Nam.
+# Chỉ dùng 1 cron trigger để không vướng giới hạn 5 trigger/tài khoản của bản Free.
+[triggers]
+crons = ["*/5 * * * *"]
+
+[vars]
+REPO = "chithong2k2/video-automation"
+WORKFLOW_FILE = "daily-video.yml"
+
+# KV để chống bắn trùng khi cron bị trễ (cùng 1 slot chỉ dispatch 1 lần/ngày)
+[[kv_namespaces]]
+binding = "SLOT_STATE"
+id = "acf22f4c4c534e058eff69da3f6c369c"

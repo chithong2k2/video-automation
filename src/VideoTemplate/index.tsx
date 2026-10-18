@@ -14,6 +14,7 @@ import { KaraokeSubtitles, SubtitleWord } from "./KaraokeSubtitles";
 export interface DynamicScene {
   id: string;
   stepLabel?: string;
+  startSeconds?: number;
   durationInSeconds?: number;
   headline?: string;
   bodyText?: string;
@@ -86,17 +87,29 @@ export const VideoTemplate: React.FC<VideoTemplateProps> = ({
           },
         ];
 
-  let currentFrameAccumulator = 0;
-  const sceneItems = displayScenes.map((scene) => {
-    const rawFrames = scene.durationInSeconds
+  // Timeline: ưu tiên startSeconds thật do pipeline suy ra từ word-boundary giọng đọc.
+  // Nhờ vậy tổng các scene luôn khớp durationInFrames -> scene cuối không bị cắt cụt.
+  let acc = 0;
+  const sceneStarts = displayScenes.map((scene) => {
+    const from =
+      typeof scene.startSeconds === "number"
+        ? Math.round(scene.startSeconds * fps)
+        : acc;
+    const dur = scene.durationInSeconds
       ? Math.round(scene.durationInSeconds * fps)
       : Math.floor(durationInFrames / displayScenes.length);
-    const from = currentFrameAccumulator;
-    currentFrameAccumulator += rawFrames;
+    acc = from + dur;
+    return from;
+  });
+
+  const sceneItems = displayScenes.map((scene, i) => {
+    const from = sceneStarts[i];
+    // Scene cuối luôn kéo tới hết video để không còn khoảng trống ở đuôi
+    const to = i < sceneStarts.length - 1 ? sceneStarts[i + 1] : durationInFrames;
     return {
       ...scene,
       from,
-      durationInFrames: rawFrames,
+      durationInFrames: Math.max(1, to - from),
     };
   });
 
@@ -190,7 +203,7 @@ export const VideoTemplate: React.FC<VideoTemplateProps> = ({
             from={scene.from}
             durationInFrames={scene.durationInFrames}
           >
-            <DynamicSceneContent scene={scene} />
+            <DynamicSceneContent scene={scene} frames={scene.durationInFrames} />
           </Sequence>
         ))}
       </AbsoluteFill>
@@ -228,10 +241,14 @@ export const VideoTemplate: React.FC<VideoTemplateProps> = ({
 };
 
 // ─── Component Render Visual Staggered Animation Từng Phần Xuất Hiện Tuần Tự ───
-const DynamicSceneContent: React.FC<{ scene: DynamicScene }> = ({ scene }) => {
+const DynamicSceneContent: React.FC<{ scene: DynamicScene; frames: number }> = ({
+  scene,
+  frames,
+}) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const duration = scene.durationInSeconds ? Math.round(scene.durationInSeconds * fps) : 180;
+  // Dùng đúng số frame của Sequence, không đoán lại từ durationInSeconds
+  const duration = Math.max(1, frames);
 
   // Hiệu ứng mờ dần khi chuyển sang cảnh tiếp theo (8 frames cuối)
   const exitOpacity = interpolate(
@@ -260,19 +277,22 @@ const DynamicSceneContent: React.FC<{ scene: DynamicScene }> = ({ scene }) => {
     extrapolateRight: "clamp",
   });
 
-  // 3. Phút 20+: Visual đồ họa mô phỏng xuất hiện thứ ba
-  const visualSpring = spring({ frame: frame - 18, fps, config: { damping: 12, mass: 0.9 } });
-  const visualScale = interpolate(visualSpring, [0, 1], [0.85, 1]);
-  const visualOpacity = interpolate(frame, [18, 26], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-
   const isMockup = scene.visualType?.includes("MOCKUP");
   const isWorkflow = scene.visualType?.includes("WORKFLOW");
   const isChart = scene.visualType?.includes("CHART");
   const isBeforeAfter = scene.visualType?.includes("BEFORE");
   const isCTA = scene.visualType?.includes("CTA") || scene.visualType?.includes("OUTRO");
+
+  // 3. Phút 20+: Visual đồ họa mô phỏng xuất hiện thứ ba
+  // Riêng CTA: hiện ngay từ frame đầu, không chờ stagger — đây là khung hình quan trọng nhất
+  const visualSpring = spring({ frame: frame - 18, fps, config: { damping: 12, mass: 0.9 } });
+  const visualScale = isCTA ? 1 : interpolate(visualSpring, [0, 1], [0.85, 1]);
+  const visualOpacity = isCTA
+    ? 1
+    : interpolate(frame, [18, 26], [0, 1], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+      });
 
   return (
     <div
@@ -311,22 +331,25 @@ const DynamicSceneContent: React.FC<{ scene: DynamicScene }> = ({ scene }) => {
         {scene.icon || "💡"} {scene.stepLabel || "NEXO STUDIO"}
       </div>
 
-      {/* 2. HEADLINE TIÊU ĐỀ (Xuất hiện ngay sau Badge) */}
-      <h1
-        style={{
-          transform: `translateY(${headlineY}px)`,
-          opacity: headlineOpacity,
-          fontSize: "58px",
-          fontWeight: 900,
-          color: "#FFFFFF",
-          lineHeight: "1.25",
-          margin: "0 0 32px 0",
-          maxWidth: "920px",
-          textShadow: "0 4px 20px rgba(0,0,0,0.8)",
-        }}
-      >
-        {scene.headline}
-      </h1>
+      {/* 2. HEADLINE TIÊU ĐỀ (Xuất hiện ngay sau Badge)
+          Scene CTA bỏ h1 vì nút CTA đã mang đúng câu đó -> trước đây bị lặp 2 lần trên màn hình */}
+      {!isCTA && (
+        <h1
+          style={{
+            transform: `translateY(${headlineY}px)`,
+            opacity: headlineOpacity,
+            fontSize: "58px",
+            fontWeight: 900,
+            color: "#FFFFFF",
+            lineHeight: "1.25",
+            margin: "0 0 32px 0",
+            maxWidth: "920px",
+            textShadow: "0 4px 20px rgba(0,0,0,0.8)",
+          }}
+        >
+          {scene.headline}
+        </h1>
+      )}
 
       {/* 3. VISUAL ĐỒ HỌA MÔ PHỎNG (Xuất hiện theo tuần tự) */}
       <div

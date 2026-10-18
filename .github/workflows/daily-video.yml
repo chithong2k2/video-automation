@@ -1,14 +1,11 @@
 name: Daily Video Pipeline
 
+# ⚠️ KHÔNG dùng `on: schedule` ở đây nữa.
+# GitHub cron là best-effort, run có thể bị delay hoặc drop hoàn toàn khi tải cao
+# (docs: "some queued jobs may be dropped"). Repo này đã bị drop 100% run theo lịch
+# ngày 18/10 -> không có video nào được đăng lúc 07:15 và 10:05.
+# Lịch giờ chạy giờ do Cloudflare Worker `worker/` đảm nhiệm, gọi workflow_dispatch.
 on:
-  schedule:
-    # 4 Video Tin Tức + 2 Video Bài Học B2B chia đều trong ngày (Giờ Việt Nam = UTC + 7, chạy lệch phút chống nghẽn hàng đợi)
-    - cron: "15 0 * * *"   # 07:15 Sáng VN -> Bản tin công nghệ & kinh doanh 1
-    - cron: "5 3 * * *"    # 10:05 Sáng VN -> Bài học thực chiến B2B 1
-    - cron: "5 6 * * *"    # 13:05 Chiều VN -> Bản tin công nghệ & kinh doanh 2
-    - cron: "5 9 * * *"    # 16:05 Chiều VN -> Bản tin công nghệ & kinh doanh 3
-    - cron: "35 11 * * *"  # 18:35 Tối VN -> Bài học thực chiến B2B 2
-    - cron: "35 13 * * *"  # 20:35 Tối VN -> Bản tin công nghệ & kinh doanh 4
   workflow_dispatch:
     inputs:
       type:
@@ -37,6 +34,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: "npm"
 
       # Remotion cần Chrome & phông chữ để render sắc nét
       - name: Install Chrome dependencies
@@ -48,8 +46,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          npm install
-          pip install edge-tts
+          npm ci
+          python -m pip install --upgrade "edge-tts==7.3.1"
 
       - name: Run pipeline
         env:

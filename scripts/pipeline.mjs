@@ -19,6 +19,16 @@ if (!GEMINI_API_KEY) {
   process.exit(1);
 }
 
+// Fail-fast: thiếu webhook thì đừng đốt 4 phút render rồi mới chết ở bước cuối
+if (!ACTIVEPIECES_WEBHOOK_URL) {
+  console.error("❌ Thiếu ACTIVEPIECES_WEBHOOK_URL — video sẽ không được đăng đi đâu cả.");
+  process.exit(1);
+}
+
+if (!EXA_API_KEY) {
+  console.warn("⚠️ Thiếu EXA_API_KEY — sẽ không lấy được tin thật, kịch bản dùng chủ đề chung.");
+}
+
 // ─── Bước 1: Exa AI tìm kiếm tin tức thực tế trên Internet ────────────────────
 async function fetchNews(topicQuery = "AI startup tech business Vietnam 2026") {
   console.log(`🔍 Exa AI đang tìm kiếm tin tức thật trên Internet theo từ khóa: "${topicQuery}"...`);
@@ -600,42 +610,118 @@ async function generateVoice(voiceScript) {
     }
     console.log(`✅ Voice & ${subtitles.length} Karaoke Subtitles created!`);
   } catch (err) {
-    console.warn("⚠️ Edge-TTS failed, fallback sang gTTS...", err.message);
-    const cleanText = voiceScript.slice(0, 300);
-    const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(cleanText)}&tl=vi&client=tw-ob`;
-    const response = await axios.get(ttsUrl, {
-      responseType: "arraybuffer",
-      headers: { "User-Agent": "Mozilla/5.0" },
-    });
-    fs.writeFileSync(publicAudioPath, Buffer.from(response.data));
-    fs.writeFileSync(outAudioPath, Buffer.from(response.data));
+    // Fallback cũ (Google Translate TTS) đã chết: trả 400 và cắt text còn 300 ký tự
+    // -> ra video câm/nửa câu mà không ai biết. Thà fail rõ ràng.
+    throw new Error(
+      `TTS thất bại: ${err.message}\n` +
+        `→ Kiểm tra: pip install edge-tts, và kết nối tới speech.platform.bing.com`
+    );
   }
 
   return { audioPath: "voice.mp3", subtitles };
 }
 
 // ─── Bước 4: Render Remotion video từ Props động do AI sinh ra ────────────────
+
+/**
+ * Dựng timeline scene khớp CHÍNH XÁC với word-boundary của giọng đọc.
+ *
+ * Trước đây scene lấy durationSeconds từ JSON của Gemini còn tổng video lấy từ
+ * lastWord.end của TTS -> hai timeline độc lập, scene cuối (CTA) bị cắt cụt.
+ * Giờ mọi mốc thời gian đều suy ra từ subtitle thật:
+ *   1. Đếm số từ voiceover của từng scene -> chia tỉ lệ trên mảng subtitle
+ *   2. Đổi mốc từ -> mốc giây thật, cộng dồn liên tục (không hở, không chồng)
+ *   3. Scene cuối được cộng thêm đuôi để CTA kịp đọc
+ */
+function buildSceneTimeline(scenes, subtitles) {
+  const safeScenes = Array.isArray(scenes) ? scenes : [];
+  if (safeScenes.length === 0) return { scenes: [], totalSeconds: 0 };
+
+  // Không có subtitle (TTS không trả boundary) -> quay về durationSeconds AI
+  if (!Array.isArray(subtitles) || subtitles.length === 0) {
+    let cursor = 0;
+    const out = safeScenes.map((s) => {
+      const d = Math.max(1, Number(s.durationSeconds) || 6);
+      const item = { ...s, startSeconds: cursor, durationSeconds: d };
+      cursor += d;
+      return item;
+    });
+    return { scenes: out, totalSeconds: cursor };
+  }
+
+  const totalWords = subtitles.length;
+
+  // Trọng số = số từ voiceover của từng scene
+  const weights = safeScenes.map((s) => {
+    const t = String(s.voiceover || "").trim();
+    return t ? t.split(/\s+/).filter(Boolean).length : 0;
+  });
+  let totalWeight = weights.reduce((a, b) => a + b, 0);
+  if (totalWeight === 0) {
+    weights.fill(1);
+    totalWeight = weights.length;
+  }
+
+  // Mốc từ cho từng scene, đảm bảo cộng dồn = totalWords
+  const wordBounds = [0];
+  let acc = 0;
+  for (let i = 0; i < safeScenes.length - 1; i++) {
+    const share = Math.max(1, Math.round((weights[i] / totalWeight) * totalWords));
+    acc = Math.min(acc + share, totalWords - 1);
+    wordBounds.push(acc);
+  }
+  wordBounds.push(totalWords);
+
+  const TAIL_SECONDS = 1.6; // đuôi để CTA kịp hiện trọn
+  const timeBounds = wordBounds.map((w, k) => {
+    if (k === 0) return 0;
+    if (k === wordBounds.length - 1) return subtitles[totalWords - 1].end + TAIL_SECONDS;
+    return subtitles[Math.min(w, totalWords - 1)].start;
+  });
+
+  const out = safeScenes.map((s, i) => ({
+    ...s,
+    startSeconds: timeBounds[i],
+    durationSeconds: Math.max(0.6, timeBounds[i + 1] - timeBounds[i]),
+  }));
+
+  return { scenes: out, totalSeconds: timeBounds[timeBounds.length - 1] };
+}
+
 async function renderVideo(script, voiceData) {
   console.log("🎬 Đang render video Remotion...");
 
   const { audioPath, subtitles } = voiceData;
 
-  // Thời lượng video khớp chuẩn với độ dài giọng nói + 2.0 giây đệm
-  let durationInSeconds = script.metadata?.targetDurationSeconds || 36;
-  if (subtitles && subtitles.length > 0) {
-    const lastWord = subtitles[subtitles.length - 1];
-    durationInSeconds = Math.max(28, Math.min(45, Math.ceil(lastWord.end + 2.0)));
-  }
+  const { scenes: timedScenes, totalSeconds } = buildSceneTimeline(
+    script.scenes,
+    subtitles
+  );
 
+  const durationInSeconds = Math.max(6, Math.ceil(totalSeconds));
   const durationInFrames = durationInSeconds * 30; // 30fps
-  console.log(`⏱️ Thời lượng video thực tế: ${durationInSeconds} giây (${durationInFrames} frames)`);
+
+  console.log(
+    `⏱️ Video: ${durationInSeconds}s (${durationInFrames} frames) | ${timedScenes.length} scenes | audio ${subtitles.length} từ`
+  );
+  timedScenes.forEach((s) => {
+    console.log(
+      `   • ${s.id} [${s.stepLabel || "?"}] ${s.startSeconds.toFixed(2)}s → ${(
+        s.startSeconds + s.durationSeconds
+      ).toFixed(2)}s`
+    );
+  });
+  if (durationInSeconds > 50) {
+    console.warn(`⚠️ Video dài ${durationInSeconds}s — vượt khuyến nghị 35-45s cho Reels/TikTok.`);
+  }
 
   const propsObj = {
     metadata: script.metadata,
     creativeDirection: script.creativeDirection,
-    scenes: (script.scenes || []).map((s) => ({
+    scenes: timedScenes.map((s) => ({
       id: s.id,
       stepLabel: s.purpose,
+      startSeconds: s.startSeconds,
       durationInSeconds: s.durationSeconds,
       headline: s.textOverlays?.[0]?.text || s.mainSubject || "",
       bodyText: s.visualDescription || s.voiceover || "",

@@ -3,20 +3,16 @@
   "version": "1.0.0",
   "description": "Auto generate & post videos to Facebook Reels + TikTok",
   "scripts": {
-    "start": "npx remotion studio",
-    "render": "node scripts/render-video.mjs",
+    "start": "remotion studio",
     "pipeline": "node scripts/pipeline.mjs",
     "build": "remotion render src/index.ts VideoTemplate out/test.mp4"
   },
   "dependencies": {
-    "@remotion/cli": "^4.0.0",
-    "@remotion/player": "^4.0.0",
     "@google/generative-ai": "^0.21.0",
-    "remotion": "^4.0.0",
+    "@remotion/cli": "4.0.536",
     "axios": "^1.7.0",
-    "form-data": "^4.0.0",
-    "googleapis": "^144.0.0",
-    "dotenv": "^16.4.0"
+    "dotenv": "^16.4.0",
+    "remotion": "4.0.536"
   },
   "devDependencies": {
     "@types/react": "^18.0.0",
