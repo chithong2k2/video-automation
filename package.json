@@ -5,6 +5,8 @@
   "scripts": {
     "start": "remotion studio",
     "pipeline": "node scripts/pipeline.mjs",
+    "freeform": "node scripts/freeform.mjs render",
+    "freeform:live": "node scripts/freeform.mjs live",
     "build": "remotion render src/index.ts VideoTemplate out/test.mp4"
   },
   "dependencies": {
