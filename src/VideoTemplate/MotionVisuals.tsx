@@ -1,8 +1,10 @@
 import React from "react";
 import {
   AbsoluteFill,
+  Img,
   interpolate,
   spring,
+  staticFile,
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
@@ -1080,14 +1082,45 @@ export const NewsCard: React.FC<{ badge?: string; caption?: string }> = ({ badge
   );
 };
 
-// ─── OUTRO: logo vẽ nét + vòng xung + nút CTA ───────────────────────────────
+// ─── OUTRO: logo thật (mark + wordmark) bung ra bằng motion graphic ─────────
+const LOGO_MARK = staticFile("brand/logo-mark.png");
+const LOGO_WORD = staticFile("brand/logo-wordmark.png");
+const LOGO_FULL = staticFile("brand/logo-full.png");
+
 export const OutroMark: React.FC<{ cta?: string; sub?: string }> = ({ cta, sub }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const draw = interpolate(frame, [0, 26], [0, 1], clampBoth);
-  const ring = (frame % 70) / 70;
-  const btn = enterStyle(frame, fps, 18, { y: 30, scale: 0.92 });
+  // Mark wipe từ trái + nở ra; wordmark wipe sau đó
+  const markWipe = interpolate(frame, [6, 28], [0, 100], clampBoth);
+  const wordWipe = interpolate(frame, [20, 44], [0, 100], clampBoth);
+  const markScale = spring({
+    frame: Math.max(0, frame - 4),
+    fps,
+    config: { damping: 15, mass: 0.9 },
+  });
+  const wordY = interpolate(frame, [20, 46], [18, 0], clampBoth);
+
+  // Vệt sáng quét qua logo
+  const sweep = interpolate(frame, [48, 82], [-45, 155], clampBoth);
+  const sweepOn = frame >= 48 && frame <= 82 ? 1 : 0;
+
+  const float = Math.sin(frame * 0.07) * 5;
+  const glowPulse = 0.55 + Math.sin(frame * 0.11) * 0.28;
+  const btn = enterStyle(frame, fps, 52, { y: 30, scale: 0.92 });
+
+  // Hạt sáng bung ra khi logo xuất hiện
+  const particles = Array.from({ length: 18 }, (_, i) => {
+    const ang = (i / 18) * Math.PI * 2 + 0.3;
+    const t = Math.max(0, frame - 8) / 55;
+    const dist = 70 + t * 210;
+    return {
+      x: Math.cos(ang) * dist,
+      y: Math.sin(ang) * dist * 0.82,
+      o: Math.max(0, 1 - t) * 0.75,
+      r: 2 + (i % 3),
+    };
+  });
 
   return (
     <div
@@ -1095,57 +1128,88 @@ export const OutroMark: React.FC<{ cta?: string; sub?: string }> = ({ cta, sub }
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        gap: 26,
+        gap: 44,
         width: 900,
       }}
     >
-      <div style={{ position: "relative", width: 190, height: 190 }}>
-        {[0, 1].map((i) => {
-          const p = (ring + i * 0.5) % 1;
-          return (
-            <div
-              key={i}
+      <div style={{ position: "relative", display: "grid", placeItems: "center" }}>
+        {/* Quầng sáng */}
+        <div
+          style={{
+            position: "absolute",
+            width: 620,
+            height: 620,
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(56,189,248,0.30) 0%, transparent 66%)",
+            filter: "blur(40px)",
+            opacity: glowPulse,
+          }}
+        />
+
+        {/* Hạt sáng */}
+        {particles.map((p, i) => (
+          <div
+            key={i}
+            style={{
+              position: "absolute",
+              width: p.r * 2,
+              height: p.r * 2,
+              borderRadius: 99,
+              background: "#7DD3FC",
+              opacity: p.o,
+              transform: `translate(${p.x}px, ${p.y}px)`,
+              boxShadow: "0 0 10px rgba(125,211,252,0.9)",
+            }}
+          />
+        ))}
+
+        {/* MARK */}
+        <div
+          style={{
+            position: "relative",
+            height: 250,
+            transform: `translateY(${float}px) scale(${markScale})`,
+            clipPath: `inset(0 ${100 - markWipe}% 0 0)`,
+          }}
+        >
+          <Img src={LOGO_MARK} style={{ height: 250, display: "block" }} />
+          {/* Vệt sáng chạy trên chính nét logo */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              opacity: sweepOn * 0.9,
+              clipPath: `polygon(${sweep}% 0%, ${sweep + 15}% 0%, ${
+                sweep + 5
+              }% 100%, ${sweep - 10}% 100%)`,
+            }}
+          >
+            <Img
+              src={LOGO_MARK}
               style={{
-                position: "absolute",
-                inset: 0,
-                borderRadius: 44,
-                border: `2px solid rgba(96,165,250,${0.5 * (1 - p)})`,
-                transform: `scale(${1 + p * 0.55})`,
+                height: 250,
+                display: "block",
+                filter: "brightness(0) invert(1)",
+                opacity: 0.85,
               }}
             />
-          );
-        })}
-        <svg width={190} height={190} viewBox="0 0 190 190">
-          <defs>
-            <linearGradient id="logoGrad" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor={P.sky} />
-              <stop offset="100%" stopColor={P.violet} />
-            </linearGradient>
-          </defs>
-          <rect
-            x={5}
-            y={5}
-            width={180}
-            height={180}
-            rx={44}
-            fill="rgba(59,130,246,0.12)"
-            stroke="rgba(96,165,250,0.5)"
-            strokeWidth={2}
-          />
-          {/* Chữ N vẽ nét */}
-          <polyline
-            points="62,132 62,58 128,132 128,58"
-            fill="none"
-            stroke="url(#logoGrad)"
-            strokeWidth={13}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeDasharray={260}
-            strokeDashoffset={260 * (1 - draw)}
-          />
-        </svg>
+          </div>
+        </div>
+
+        {/* WORDMARK */}
+        <div
+          style={{
+            marginTop: 22,
+            height: 58,
+            transform: `translateY(${wordY}px)`,
+            clipPath: `inset(0 ${100 - wordWipe}% 0 0)`,
+          }}
+        >
+          <Img src={LOGO_WORD} style={{ height: 58, display: "block" }} />
+        </div>
       </div>
 
+      {/* CTA */}
       <div
         style={{
           display: "inline-flex",
@@ -1166,7 +1230,6 @@ export const OutroMark: React.FC<{ cta?: string; sub?: string }> = ({ cta, sub }
         }}
       >
         {cta || "Nhắn tin cho Nexo Studio"}
-        {/* Vệt sáng chạy qua */}
         <div
           style={{
             position: "absolute",
@@ -1197,3 +1260,62 @@ export const OutroMark: React.FC<{ cta?: string; sub?: string }> = ({ cta, sub }
     </div>
   );
 };
+
+// ─── Header: logo mark nhỏ + tên thương hiệu ────────────────────────────────
+export const BrandTag: React.FC<{ pulse?: number }> = ({ pulse = 0 }) => (
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      padding: "8px 22px 8px 12px",
+      borderRadius: 99,
+      background: "rgba(7,10,18,0.55)",
+      border: "1px solid rgba(148,163,184,0.22)",
+      backdropFilter: "blur(12px)",
+    }}
+  >
+    <Img src={LOGO_MARK} style={{ height: 46, display: "block" }} />
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        lineHeight: 1,
+        textAlign: "left",
+      }}
+    >
+      <span
+        style={{
+          fontSize: 22,
+          fontWeight: 900,
+          letterSpacing: "2.5px",
+          color: "rgba(248,250,252,0.94)",
+        }}
+      >
+        NEXO STUDIO
+      </span>
+      <span
+        style={{
+          fontSize: 14,
+          fontWeight: 700,
+          letterSpacing: "1.6px",
+          color: "rgba(56,189,248,0.8)",
+          marginTop: 5,
+        }}
+      >
+        CHUYỂN ĐỔI SỐ & TỰ ĐỘNG HÓA
+      </span>
+    </div>
+    <span
+      style={{
+        width: 8,
+        height: 8,
+        borderRadius: 99,
+        background: P.green,
+        opacity: 0.6 + pulse * 0.4,
+      }}
+    />
+  </div>
+);
+
+export { LOGO_FULL };

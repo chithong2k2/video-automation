@@ -11,6 +11,7 @@ import {
 import { KaraokeSubtitles, SubtitleWord } from "./KaraokeSubtitles";
 import {
   BarChart,
+  BrandTag,
   FONT,
   KineticText,
   MotionBackground,
@@ -76,7 +77,6 @@ export const VideoTemplate: React.FC<VideoTemplateProps> = ({
   const { fps, durationInFrames } = useVideoConfig();
 
   const progress = (frame / durationInFrames) * 100;
-
   // Cấu hình các cảnh hiển thị linh động theo AI
   const displayScenes: DynamicScene[] =
     scenes.length > 0
@@ -134,6 +134,15 @@ export const VideoTemplate: React.FC<VideoTemplateProps> = ({
     };
   });
 
+  // Header mờ dần khi vào cảnh cuối (outro đã có logo riêng, không cần lặp)
+  const lastSceneStart = sceneStarts[sceneStarts.length - 1] ?? 0;
+  const headerOpacity = interpolate(
+    frame,
+    [lastSceneStart, lastSceneStart + 12],
+    [1, 0],
+    clampBoth
+  );
+
   return (
     <AbsoluteFill style={{ color: P.text, fontFamily: FONT }}>
       <MotionBackground tint={P.blue} />
@@ -149,46 +158,20 @@ export const VideoTemplate: React.FC<VideoTemplateProps> = ({
         />
       ) : null}
 
-      {/* Header nhận diện */}
+      {/* Header nhận diện — logo thật, mờ dần ở cảnh cuối để outro sạch */}
       <div
         style={{
           position: "absolute",
-          top: 74,
+          top: 64,
           left: 0,
           right: 0,
           display: "flex",
           justifyContent: "center",
           zIndex: 50,
+          opacity: headerOpacity,
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: "10px 26px",
-            borderRadius: 99,
-            background: "rgba(7,10,18,0.55)",
-            border: "1px solid rgba(148,163,184,0.22)",
-            backdropFilter: "blur(12px)",
-            fontSize: 20,
-            fontWeight: 800,
-            letterSpacing: "3px",
-            color: "rgba(248,250,252,0.62)",
-            textTransform: "uppercase",
-          }}
-        >
-          <span
-            style={{
-              width: 9,
-              height: 9,
-              borderRadius: 99,
-              background: P.green,
-              opacity: 0.6 + Math.sin(frame * 0.18) * 0.4,
-            }}
-          />
-          Nexo Studio
-        </div>
+        <BrandTag pulse={Math.sin(frame * 0.18)} />
       </div>
 
       {/* Scene nội dung */}
