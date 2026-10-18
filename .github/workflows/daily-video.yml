@@ -17,6 +17,11 @@ on:
           - auto
           - news
           - lesson
+      dry_run:
+        description: "Chỉ sinh kịch bản để kiểm tra chủ đề, không render/không đăng"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   generate-and-post:
@@ -66,7 +71,7 @@ jobs:
           EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
           ACTIVEPIECES_WEBHOOK_URL: ${{ secrets.ACTIVEPIECES_WEBHOOK_URL }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/pipeline.mjs --type=${{ inputs.type || 'auto' }}
+        run: node scripts/pipeline.mjs --type=${{ inputs.type || 'auto' }} ${{ inputs.dry_run && '--dry-run' || '' }}
 
       # Giữ video như artifact phòng khi cần xem lại
       - name: Upload video artifact

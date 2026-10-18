@@ -970,6 +970,17 @@ async function main() {
 
     console.log(`✅ Chủ đề chốt: "${script.metadata?.topic}"`);
 
+    // Chế độ kiểm tra: chỉ sinh kịch bản, không render/không đăng
+    if (process.argv.includes("--dry-run")) {
+      console.log("\n🧪 DRY RUN — không render, không đăng.");
+      console.log("storyKey:", script.metadata?.storyKey || "(AI không trả)");
+      (script.scenes || []).forEach((s, i) => {
+        console.log(`  ${i + 1}. [${s.purpose || "?"}] ${s.textOverlays?.[0]?.text || ""}`);
+        console.log(`     ${s.voiceover || ""}`);
+      });
+      return;
+    }
+
     const voiceText =
       script.voiceoverFullText ||
       (script.scenes || []).map((s) => s.voiceover).filter(Boolean).join(" ");
