@@ -59,7 +59,14 @@ async function fetchNews(query) {
 }
 
 // ─── Gemini: brainstorm -> chọn -> viết kịch bản ────────────────────────────
-const MODELS = ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash"];
+/**
+ * Danh sách model KHÔNG hardcode cứng.
+ * Bài học 2026-10-18: "gemini-2.5-flash" và "gemini-2.0-flash" trả 404
+ * "no longer available to new users" -> chuỗi fallback 3 model thực chất chỉ có 1.
+ * Giờ tự hỏi ListModels lúc chạy, nên model mới/chết không làm hỏng pipeline.
+ */
+const PRIMARY_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+const DEAD_MODEL_HINTS = /embedding|aqa|image|tts|veo|imagen|learnlm/i;
 
 const envList = (name) =>
   String(process.env[name] || "")
@@ -67,23 +74,69 @@ const envList = (name) =>
     .map((t) => t.trim())
     .filter(Boolean);
 
-/** Gọi Gemini, thử lần lượt các model, trả JSON đã parse. */
+/** Hỏi Google xem tài khoản này thật sự gọi được model nào. */
+async function listUsableModels() {
+  try {
+    const { data } = await axios.get(
+      "https://generativelanguage.googleapis.com/v1beta/models",
+      { params: { key: GEMINI_API_KEY, pageSize: 200 }, timeout: 15000 }
+    );
+    return (data.models || [])
+      .filter((m) => (m.supportedGenerationMethods || []).includes("generateContent"))
+      .map((m) => String(m.name).replace(/^models\//, ""))
+      .filter((n) => !DEAD_MODEL_HINTS.test(n));
+  } catch (e) {
+    console.warn(`⚠️ Không lấy được danh sách model: ${e.message}`);
+    return [];
+  }
+}
+
+const isTransient = (e) => /\[(503|429|500)\]|high demand|overloaded|timeout/i.test(e.message);
+const isGone = (e) => /\[404\]|no longer available|not found/i.test(e.message);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Gọi Gemini, tự tìm model còn sống, thử lại khi lỗi tạm thời. */
 async function callGemini(prompt, label) {
   if (!GEMINI_API_KEY) throw new Error("Thiếu GEMINI_API_KEY");
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
-  for (const name of MODELS) {
-    try {
-      console.log(`📡 Gemini [${name}] · ${label}...`);
-      const model = genAI.getGenerativeModel({ model: name });
-      const res = await model.generateContent(prompt);
-      const raw = res.response.text().replace(/```json|```/g, "").trim();
-      return JSON.parse(raw);
-    } catch (e) {
-      console.warn(`⚠️ [${name}] ${e.message}`);
+  const discovered = await listUsableModels();
+  const preferred = discovered
+    .filter((n) => /flash/i.test(n))
+    .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+  const rest = discovered.filter((n) => !preferred.includes(n));
+
+  const candidates = [
+    ...new Set([PRIMARY_MODEL, ...envList("GEMINI_MODELS"), ...preferred, ...rest]),
+  ];
+  if (!candidates.length) candidates.push(PRIMARY_MODEL);
+
+  let last = null;
+  for (const name of candidates) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        console.log(`📡 Gemini [${name}] · ${label}${attempt > 1 ? ` (lần ${attempt})` : ""}...`);
+        const model = genAI.getGenerativeModel({ model: name });
+        const res = await model.generateContent(prompt);
+        const raw = res.response.text().replace(/```json|```/g, "").trim();
+        return JSON.parse(raw);
+      } catch (e) {
+        last = e;
+        const msg = e.message.split("\n")[0].slice(0, 110);
+        console.warn(`⚠️ [${name}] ${msg}`);
+
+        if (isGone(e)) break; // model chết -> thử model khác ngay
+        if (!isTransient(e)) break; // JSON hỏng / lỗi khác -> thử model khác
+
+        if (attempt < 2) await sleep(attempt * 6000);
+      }
     }
   }
-  throw new Error(`Gemini thất bại ở bước "${label}"`);
+  throw new Error(
+    `Gemini thất bại ở bước "${label}" — đã thử ${candidates.length} model. Cuối: ${
+      last ? last.message.split("\n")[0] : "?"
+    }`
+  );
 }
 
 /** BƯỚC 1 — nghĩ ra 5 phương án dựng hình, chưa viết kịch bản. */
@@ -199,7 +252,6 @@ async function writeScriptForced(newsItems, banned, recentTypes, dirKey) {
 
 // ─── Voice: edge-tts cho từng cảnh + word boundary để karaoke ───────────────
 const VOICE_DIR = path.join(ROOT, "public", "voice");
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function ttsScene(text, index) {
   fs.mkdirSync(VOICE_DIR, { recursive: true });
