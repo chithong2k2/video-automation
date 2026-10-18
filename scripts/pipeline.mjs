@@ -706,7 +706,7 @@ async function renderVideo(script, voiceData) {
   );
   timedScenes.forEach((s) => {
     console.log(
-      `   • ${s.id} [${s.stepLabel || "?"}] ${s.startSeconds.toFixed(2)}s → ${(
+      `   • ${s.id} [${s.stepLabel || s.purpose || "?"}] ${s.startSeconds.toFixed(2)}s → ${(
         s.startSeconds + s.durationSeconds
       ).toFixed(2)}s`
     );
