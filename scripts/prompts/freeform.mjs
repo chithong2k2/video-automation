@@ -171,7 +171,9 @@ Mỗi cảnh có thêm trường "voiceover": câu tiếng Việt sẽ được 
   "một triệu token", "Apache hai chấm không".
 - Từ viết tắt đọc được thì để nguyên (GPU, AI, NVFP4), từ khó đọc thì viết theo âm.
 - Tổng độ dài lời thoại quyết định độ dài video. Video sẽ tự dài ra nếu lời dài hơn
-  "seconds" khai báo — nên đừng viết quá dài, mục tiêu cả video 35–45 giây.
+  "seconds" khai báo — nên đừng viết quá dài.
+- Giọng đọc tiếng Việt chạy khoảng 4 từ/giây. Để video rơi vào 35–45 giây, TỔNG số từ
+  của tất cả "voiceover" phải nằm trong khoảng 140–170 từ. Đếm lại trước khi trả JSON.
 
 Ví dụ một cảnh có đủ:
 { "type":"grid", "seconds":7, "voiceover":"Mỗi lần chạy, chỉ hai mươi ba tỷ tham số được đánh thức. Chưa tới năm phần trăm bộ não đó thực sự hoạt động.",
