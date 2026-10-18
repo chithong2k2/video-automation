@@ -21,6 +21,7 @@ import axios from "axios";
 import "dotenv/config";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { buildFreeformPrompt, VISUAL_DIRECTIONS } from "./prompts/freeform.mjs";
+import { buildBrainstormPrompt, buildScriptPrompt } from "./prompts/brainstorm.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const EXA_API_KEY = process.env.EXA_API_KEY;
@@ -57,84 +58,143 @@ async function fetchNews(query) {
   }));
 }
 
-// ─── Gemini: viết kịch bản ───────────────────────────────────────────────────
-/** Chọn hướng dựng hình: ưu tiên --direction, không thì xoay vòng sau hướng video trước. */
-function pickDirection() {
-  const forced = flag("direction", "").trim().toUpperCase();
-  const byKey = (k) => VISUAL_DIRECTIONS.find((d) => d.key === k);
+// ─── Gemini: brainstorm -> chọn -> viết kịch bản ────────────────────────────
+const MODELS = ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash"];
 
-  if (forced) {
-    const hit = byKey(forced);
-    if (hit) return hit;
-    console.warn(`⚠️ Không có hướng "${forced}" — dùng xoay vòng.`);
-  }
+const envList = (name) =>
+  String(process.env[name] || "")
+    .split("||")
+    .map((t) => t.trim())
+    .filter(Boolean);
 
-  const last = String(process.env.LAST_DIR || "").trim().toUpperCase();
-  const li = VISUAL_DIRECTIONS.findIndex((d) => d.key === last);
-  const next = VISUAL_DIRECTIONS[(li + 1) % VISUAL_DIRECTIONS.length];
-  console.log(`🎨 Hướng dựng hình: ${next.name} (${next.key})`);
-  return next;
-}
-
-async function writeScript(newsItems) {
+/** Gọi Gemini, thử lần lượt các model, trả JSON đã parse. */
+async function callGemini(prompt, label) {
   if (!GEMINI_API_KEY) throw new Error("Thiếu GEMINI_API_KEY");
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
-  // Chủ đề các video gần nhất (workflow nạp từ release notes) -> cấm lặp
-  const banned = String(process.env.RECENT_TOPICS || "")
-    .split("||")
-    .map((t) => t.trim())
-    .filter(Boolean);
-
-  // Chuỗi primitive của các video gần nhất -> cấm lặp lại cùng một ngữ pháp hình ảnh
-  const recentTypes = String(process.env.RECENT_TYPES || "")
-    .split("||")
-    .map((t) => t.trim())
-    .filter(Boolean);
-
-  const direction = pickDirection();
-  const prompt = buildFreeformPrompt(newsItems, banned, { direction, recentTypes });
-
-  for (const name of ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash"]) {
+  for (const name of MODELS) {
     try {
-      console.log(`📡 Gemini [${name}]...`);
+      console.log(`📡 Gemini [${name}] · ${label}...`);
       const model = genAI.getGenerativeModel({ model: name });
       const res = await model.generateContent(prompt);
       const raw = res.response.text().replace(/```json|```/g, "").trim();
-      const script = JSON.parse(raw);
-      if (!Array.isArray(script.scenes) || !script.scenes.length) {
-        throw new Error("JSON không có scenes");
-      }
-      script.metadata = script.metadata || {};
-      script.metadata.direction = direction.key;
-      console.log(`✅ ${script.scenes.length} cảnh · ${script.metadata?.topic || ""}`);
-      console.log(`   ${script.scenes.map((s) => s.type).join(" > ")}`);
-
-      const spine = new Set(direction.spine);
-      const used = script.scenes.filter((s) => spine.has(s.type)).length;
-      if (used < direction.need) {
-        console.warn(
-          `⚠️ Hướng ${direction.name} cần ≥${direction.need} cảnh thuộc [${direction.spine.join(
-            ", "
-          )}], nhưng chỉ có ${used}. Video vẫn render nhưng sẽ giống video cũ.`
-        );
-      }
-
-      const tally = script.scenes.reduce((m, s) => ((m[s.type] = (m[s.type] || 0) + 1), m), {});
-      const overused = Object.entries(tally).filter(([t, n]) => n >= 3 && t !== "canvas");
-      if (overused.length) {
-        console.warn(
-          `⚠️ Lặp cảnh trong cùng video: ${overused
-            .map(([t, n]) => `${t}×${n}`)
-            .join(", ")} — sẽ trông đơn điệu.`
-        );
-      }
-      return script;
+      return JSON.parse(raw);
     } catch (e) {
       console.warn(`⚠️ [${name}] ${e.message}`);
     }
   }
-  throw new Error("Cả 3 model đều thất bại");
+  throw new Error(`Gemini thất bại ở bước "${label}"`);
+}
+
+/** BƯỚC 1 — nghĩ ra 5 phương án dựng hình, chưa viết kịch bản. */
+async function brainstormConcepts(newsItems, banned, recentTypes) {
+  const out = await callGemini(
+    buildBrainstormPrompt(newsItems, banned, recentTypes),
+    "brainstorm"
+  );
+
+  const concepts = Array.isArray(out.concepts) ? out.concepts : [];
+  if (concepts.length < 4) {
+    throw new Error(`Brainstorm chỉ ra ${concepts.length} phương án (cần ≥4)`);
+  }
+
+  const spines = concepts.map((c) => (c.spine || []).join(","));
+  const distinct = new Set(spines).size;
+  if (distinct < 4) {
+    console.warn(
+      `⚠️ 5 phương án nhưng chỉ có ${distinct} bộ xương khác nhau — brainstorm hơi trùng.`
+    );
+  }
+
+  const usesCanvas = concepts.filter((c) => (c.spine || []).includes("canvas")).length;
+  if (usesCanvas < 2) {
+    console.warn(`⚠️ Chỉ ${usesCanvas} phương án dùng canvas (nên có ≥2).`);
+  }
+
+  console.log(`💡 Brainstorm: ${concepts.length} phương án · ${distinct} bộ xương khác nhau`);
+  if (out.keyFact) console.log(`   Điều phải nhớ: ${out.keyFact}`);
+  for (const c of concepts) {
+    console.log(`   ${c.id}. ${c.label} — ${(c.spine || []).join(" > ")}`);
+    console.log(`      ${c.angle}`);
+  }
+  return out;
+}
+
+/** BƯỚC 2 — chấm điểm, chọn phương án, rồi viết kịch bản đầy đủ. */
+async function writeScript(newsItems, brainstorm, recentTypes) {
+  const script = await callGemini(
+    buildScriptPrompt(newsItems, brainstorm, recentTypes),
+    "kịch bản"
+  );
+
+  if (!Array.isArray(script.scenes) || !script.scenes.length) {
+    throw new Error("JSON không có scenes");
+  }
+
+  script.metadata = script.metadata || {};
+  script.brainstorm = brainstorm;
+  script.decision = script.decision || {};
+
+  const d = script.decision;
+  const chosen = brainstorm.concepts.find((c) => c.id === d.chosen);
+  console.log(
+    `🎯 Chọn phương án ${d.chosen}${chosen ? ` — ${chosen.label}` : ""}${
+      Array.isArray(d.merged) && d.merged.length > 1 ? ` (lai ${d.merged.join("+")})` : ""
+    }`
+  );
+  if (Array.isArray(d.scores)) {
+    for (const s of d.scores) {
+      const c = brainstorm.concepts.find((x) => x.id === s.id);
+      const mark = s.id === d.chosen ? " ←" : "";
+      console.log(
+        `   ${s.id}. ${(c?.label || "?").padEnd(14)} ` +
+          `hợp ${s.dungHop} · rõ ${s.roRang} · mới ${s.moi} · khả thi ${s.khaThi} = ${s.total}${mark}`
+      );
+    }
+  }
+  if (d.why) console.log(`   Vì sao: ${d.why}`);
+
+  script.metadata.concept = script.metadata.concept || chosen?.label || "";
+  console.log(`✅ ${script.scenes.length} cảnh · ${script.metadata?.topic || ""}`);
+  console.log(`   ${script.scenes.map((s) => s.type).join(" > ")}`);
+
+  const tally = script.scenes.reduce((m, s) => ((m[s.type] = (m[s.type] || 0) + 1), m), {});
+  const overused = Object.entries(tally).filter(([t, n]) => n >= 3 && t !== "canvas");
+  if (overused.length) {
+    console.warn(
+      `⚠️ Lặp cảnh trong cùng video: ${overused
+        .map(([t, n]) => `${t}×${n}`)
+        .join(", ")} — sẽ trông đơn điệu.`
+    );
+  }
+  if (!tally.canvas) {
+    console.warn("⚠️ Không có cảnh canvas nào — video sẽ không có hình tự bố cục.");
+  }
+  return script;
+}
+
+/** Đường thủ công: ép một hướng cố định bằng --direction (bỏ qua brainstorm). */
+async function writeScriptForced(newsItems, banned, recentTypes, dirKey) {
+  const direction = VISUAL_DIRECTIONS.find((d) => d.key === dirKey);
+  if (!direction) {
+    throw new Error(
+      `Không có hướng "${dirKey}". Chọn: ${VISUAL_DIRECTIONS.map((d) => d.key).join(", ")}`
+    );
+  }
+  console.log(`🎨 Ép hướng: ${direction.name} (${direction.key})`);
+
+  const script = await callGemini(
+    buildFreeformPrompt(newsItems, banned, { direction, recentTypes }),
+    "kịch bản (ép hướng)"
+  );
+  if (!Array.isArray(script.scenes) || !script.scenes.length) {
+    throw new Error("JSON không có scenes");
+  }
+  script.metadata = script.metadata || {};
+  script.metadata.concept = direction.name;
+  console.log(`✅ ${script.scenes.length} cảnh · ${script.metadata?.topic || ""}`);
+  console.log(`   ${script.scenes.map((s) => s.type).join(" > ")}`);
+  return script;
 }
 
 // ─── Voice: edge-tts cho từng cảnh + word boundary để karaoke ───────────────
@@ -224,14 +284,14 @@ function uploadToRelease(videoPath, script) {
   const tag = `v${Date.now()}`;
   const topic = (script.metadata?.topic || "Video Nexo Studio").replace(/["\r\n]/g, " ");
   const storyKey = (script.metadata?.storyKey || "").replace(/["\r\n]/g, " ");
-  const dirKey = (script.metadata?.direction || "").replace(/["\r\n]/g, " ");
+  const dirKey = (script.metadata?.concept || "").replace(/["\r\n]/g, " ");
   const types = (script.scenes || [])
     .map((s) => s.type)
     .filter(Boolean)
     .join(",");
   const notes = [
     `TOPIC: ${topic} :: ${storyKey}`,
-    `DIR: ${dirKey}`,
+    `CONCEPT: ${dirKey}`,
     `TYPES: ${types}`,
     `Automated daily video`,
   ].join("\n");
@@ -330,7 +390,19 @@ const save = (script, file = "out/freeform-script.json") => {
     const news = await fetchNews(query);
     if (!news.length) throw new Error("Exa không trả về tin nào");
 
-    const script = await writeScript(news);
+    const banned = envList("RECENT_TOPICS");
+    const recentTypes = envList("RECENT_TYPES");
+    const forced = flag("direction", "").trim().toUpperCase();
+
+    let script;
+    if (forced) {
+      // Đường thủ công: ép một hướng cố định, bỏ qua brainstorm
+      script = await writeScriptForced(news, banned, recentTypes, forced);
+    } else {
+      // Đường mặc định: AI tự nghĩ 5 phương án -> chấm điểm -> chọn -> viết
+      const bs = await brainstormConcepts(news, banned, recentTypes);
+      script = await writeScript(news, bs, recentTypes);
+    }
     await addVoice(script);
     const jsonPath = save(script, flag("json", "out/freeform-script.json"));
 

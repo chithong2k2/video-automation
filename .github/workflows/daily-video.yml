@@ -54,9 +54,8 @@ jobs:
           npm ci
           python -m pip install --upgrade "edge-tts==7.3.1"
 
-      # Nạp chủ đề ~15 video gần nhất để pipeline không lặp lại cùng một tin
-      # + hướng dựng hình của video trước (để xoay vòng)
-      # + chuỗi primitive của 6 video trước (để không lặp lại ngữ pháp hình ảnh)
+      # Nạp chủ đề ~15 video gần nhất để không lặp tin
+      # + chuỗi primitive của 6 video trước để AI brainstorm không lặp lại ngữ pháp cũ
       - name: Load recent topics
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -69,16 +68,11 @@ jobs:
           TYPES=$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=6" \
             --jq '[.[] | (.body // "") | split("\n") | map(select(startswith("TYPES:"))) | .[0] // "" | sub("^TYPES:[ ]*"; "")] | map(select(. != "")) | join(" || ")')
 
-          LAST_DIR=$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=1" \
-            --jq '.[0].body // "" | split("\n") | map(select(startswith("DIR:"))) | .[0] // "" | sub("^DIR:[ ]*"; "")')
-
-          echo "Hướng video trước: ${LAST_DIR:-(chưa có)}"
           echo "Chuỗi cảnh cũ: ${TYPES:-(chưa có)}"
 
           {
             echo "RECENT_TOPICS=$RECENT"
             echo "RECENT_TYPES=$TYPES"
-            echo "LAST_DIR=$LAST_DIR"
           } >> "$GITHUB_ENV"
 
       # TIN TỨC -> hệ mới: FreeVideo + thư viện primitive + voice từng cảnh
