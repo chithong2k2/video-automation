@@ -163,7 +163,7 @@ Dùng khi tin có một cột mốc long trọng (giấy phép, chứng nhận, 
 
 Mỗi cảnh có thêm trường "voiceover": câu tiếng Việt sẽ được đọc thành tiếng.
 
-- 14–20 từ mỗi câu. Đọc tự nhiên, như đang nói với người xem, không như đọc báo.
+- 14–22 từ mỗi câu. Đọc tự nhiên, như đang nói với người xem, không như đọc báo.
 - Câu này KHÔNG hiện trên hình. Chữ trên hình (headline, title, label) viết ngắn;
   voiceover mới là câu nói đầy đủ.
 - Đừng lặp lại y nguyên chữ trên hình. Hình và lời phải bổ sung cho nhau.
@@ -172,9 +172,11 @@ Mỗi cảnh có thêm trường "voiceover": câu tiếng Việt sẽ được 
 - Từ viết tắt đọc được thì để nguyên (GPU, AI, NVFP4), từ khó đọc thì viết theo âm.
 - Tổng độ dài lời thoại quyết định độ dài video. Video sẽ tự dài ra nếu lời dài hơn
   "seconds" khai báo — nên đừng viết quá dài.
-- Giọng đọc tiếng Việt chạy khoảng 4 từ/giây. Để video rơi vào 35–45 giây, TỔNG số từ
-  của tất cả "voiceover" phải nằm trong khoảng 140–160 từ. Đếm lại trước khi trả JSON.
-  Đây là ràng buộc CỨNG: 160 từ là trần, vượt là video quá dài.
+- Giọng đọc tiếng Việt chạy khoảng 4 từ/giây. Mục tiêu 35–45 giây, TỔNG số từ của tất
+  cả "voiceover" nằm trong khoảng 140–175 từ.
+- NHƯNG nếu tin phức tạp, cần thêm đất để diễn đạt cho rõ, được phép dài tới 55 giây
+  (khoảng 215 từ). Thà dài mà đủ ý còn hơn ngắn mà cụt nghĩa.
+- Trần tuyệt đối là 55 giây. Đếm lại tổng số từ trước khi trả JSON.
 
 Ví dụ một cảnh có đủ:
 { "type":"grid", "seconds":7, "voiceover":"Mỗi lần chạy, chỉ hai mươi ba tỷ tham số được đánh thức. Chưa tới năm phần trăm bộ não đó thực sự hoạt động.",
@@ -212,8 +214,8 @@ ${FREE_PRIMITIVES}
 
 ## LUẬT VIẾT KỊCH BẢN
 1. Chọn ĐÚNG MỘT tin làm chủ đề. Không gộp nhiều tin rời rạc.
-2. Cấu trúc bắt buộc: cover (hook) → 5-6 cảnh thân → outro. Tổng 7-8 cảnh.
-3. Tổng thời lượng 35-45 giây. Cộng các "seconds" lại phải rơi vào khoảng này.
+2. Cấu trúc bắt buộc: cover (hook) → 5-7 cảnh thân → outro. Tổng 7-9 cảnh.
+3. Tổng thời lượng 35-45 giây là chuẩn; được phép tới 55 giây nếu cần đủ đất diễn đạt.
 4. Dùng ÍT NHẤT 4 loại primitive khác nhau. Không dùng 3 cảnh "bars" liên tiếp.
 5. Chỉ dùng primitive có trong danh sách trên. Không bịa type mới.
 6. "accent" phải là một từ CÓ THẬT trong "title", nguyên văn.

@@ -284,9 +284,9 @@ const save = (script, file = "out/freeform-script.json") => {
     console.log(
       `📊 Tổng thời lượng: ${total.toFixed(1)}s · ${script.scenes.length} cảnh · ${words} từ`
     );
-    if (total > 46) {
+    if (total > 56) {
       console.warn(
-        `⚠️ Video ${total.toFixed(1)}s — vượt mốc 45s (${words} từ). Giảm lời thoại hoặc bớt cảnh.`
+        `⚠️ Video ${total.toFixed(1)}s — vượt trần 55s (${words} từ). Giảm lời thoại hoặc bớt cảnh.`
       );
     }
 
