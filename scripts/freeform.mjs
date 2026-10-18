@@ -20,7 +20,7 @@ import { fileURLToPath } from "node:url";
 import axios from "axios";
 import "dotenv/config";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { buildFreeformPrompt } from "./prompts/freeform.mjs";
+import { buildFreeformPrompt, VISUAL_DIRECTIONS } from "./prompts/freeform.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const EXA_API_KEY = process.env.EXA_API_KEY;
@@ -58,6 +58,24 @@ async function fetchNews(query) {
 }
 
 // ─── Gemini: viết kịch bản ───────────────────────────────────────────────────
+/** Chọn hướng dựng hình: ưu tiên --direction, không thì xoay vòng sau hướng video trước. */
+function pickDirection() {
+  const forced = flag("direction", "").trim().toUpperCase();
+  const byKey = (k) => VISUAL_DIRECTIONS.find((d) => d.key === k);
+
+  if (forced) {
+    const hit = byKey(forced);
+    if (hit) return hit;
+    console.warn(`⚠️ Không có hướng "${forced}" — dùng xoay vòng.`);
+  }
+
+  const last = String(process.env.LAST_DIR || "").trim().toUpperCase();
+  const li = VISUAL_DIRECTIONS.findIndex((d) => d.key === last);
+  const next = VISUAL_DIRECTIONS[(li + 1) % VISUAL_DIRECTIONS.length];
+  console.log(`🎨 Hướng dựng hình: ${next.name} (${next.key})`);
+  return next;
+}
+
 async function writeScript(newsItems) {
   if (!GEMINI_API_KEY) throw new Error("Thiếu GEMINI_API_KEY");
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
@@ -68,7 +86,14 @@ async function writeScript(newsItems) {
     .map((t) => t.trim())
     .filter(Boolean);
 
-  const prompt = buildFreeformPrompt(newsItems, banned);
+  // Chuỗi primitive của các video gần nhất -> cấm lặp lại cùng một ngữ pháp hình ảnh
+  const recentTypes = String(process.env.RECENT_TYPES || "")
+    .split("||")
+    .map((t) => t.trim())
+    .filter(Boolean);
+
+  const direction = pickDirection();
+  const prompt = buildFreeformPrompt(newsItems, banned, { direction, recentTypes });
 
   for (const name of ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash"]) {
     try {
@@ -80,7 +105,20 @@ async function writeScript(newsItems) {
       if (!Array.isArray(script.scenes) || !script.scenes.length) {
         throw new Error("JSON không có scenes");
       }
+      script.metadata = script.metadata || {};
+      script.metadata.direction = direction.key;
       console.log(`✅ ${script.scenes.length} cảnh · ${script.metadata?.topic || ""}`);
+      console.log(`   ${script.scenes.map((s) => s.type).join(" > ")}`);
+
+      const spine = new Set(direction.spine);
+      const used = script.scenes.filter((s) => spine.has(s.type)).length;
+      if (used < direction.need) {
+        console.warn(
+          `⚠️ Hướng ${direction.name} cần ≥${direction.need} cảnh thuộc [${direction.spine.join(
+            ", "
+          )}], nhưng chỉ có ${used}. Video vẫn render nhưng sẽ giống video cũ.`
+        );
+      }
       return script;
     } catch (e) {
       console.warn(`⚠️ [${name}] ${e.message}`);
@@ -176,7 +214,17 @@ function uploadToRelease(videoPath, script) {
   const tag = `v${Date.now()}`;
   const topic = (script.metadata?.topic || "Video Nexo Studio").replace(/["\r\n]/g, " ");
   const storyKey = (script.metadata?.storyKey || "").replace(/["\r\n]/g, " ");
-  const notes = `TOPIC: ${topic} :: ${storyKey}\nAutomated daily video`;
+  const dirKey = (script.metadata?.direction || "").replace(/["\r\n]/g, " ");
+  const types = (script.scenes || [])
+    .map((s) => s.type)
+    .filter(Boolean)
+    .join(",");
+  const notes = [
+    `TOPIC: ${topic} :: ${storyKey}`,
+    `DIR: ${dirKey}`,
+    `TYPES: ${types}`,
+    `Automated daily video`,
+  ].join("\n");
 
   console.log("☁️ Upload lên GitHub Release...");
   execSync(

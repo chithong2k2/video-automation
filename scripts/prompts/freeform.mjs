@@ -7,6 +7,91 @@
  * khớp schema — nên graphic thật sự thay đổi theo tin.
  */
 
+/**
+ * HƯỚNG DỰNG HÌNH — luân phiên mỗi video một hướng.
+ *
+ * Vì sao cần: prompt liệt kê primitive theo thứ tự, AI có xu hướng đi dọc danh sách
+ * và ra đúng một chuỗi "cover > stat > bars > compare > versus > steps > quote > outro"
+ * cho MỌI tin. Đó là lý do các video trông giống nhau chỉ đổi chữ.
+ *
+ * Mỗi hướng ép một "bộ xương" primitive khác nhau -> ngữ pháp hình ảnh khác nhau.
+ */
+export const VISUAL_DIRECTIONS = [
+  {
+    key: "QUY_MO",
+    name: "QUY MÔ",
+    brief:
+      "Kể tin bằng ĐỘ LỚN. Người xem phải cảm được con số to đến mức nào, " +
+      "không chỉ đọc nó. Ưu tiên đếm, lặp, trải dài, đóng dấu.",
+    spine: ["grid", "rack", "stream", "stamp"],
+    need: 3,
+    limit: ["bars", "versus"],
+  },
+  {
+    key: "DOI_CHIEU",
+    name: "ĐỐI CHIẾU",
+    brief:
+      "Đặt hai thứ cạnh nhau và để người xem tự thấy khác biệt. " +
+      "Cấu trúc video là các cặp so sánh nối tiếp, không phải liệt kê.",
+    spine: ["versus", "compare", "bars", "steps"],
+    need: 3,
+    limit: ["grid", "rack"],
+  },
+  {
+    key: "TU_VE",
+    name: "TỰ VẼ",
+    brief:
+      "Bố cục hình riêng cho đúng tin này bằng canvas: tự đặt từng khối, đường, " +
+      "mũi tên, vòng tròn theo toạ độ. Càng ít khung có sẵn càng tốt.",
+    spine: ["canvas"],
+    need: 2,
+    limit: ["stat", "bars"],
+  },
+  {
+    key: "DIEN_BIEN",
+    name: "DIỄN BIẾN",
+    brief:
+      "Kể như một chuỗi sự kiện: cái gì xảy ra, rồi cái gì, và hệ quả là gì. " +
+      "Mỗi cảnh là một mắt xích, không phải một con số rời.",
+    spine: ["steps", "stamp", "canvas", "quote"],
+    need: 3,
+    limit: ["bars"],
+  },
+  {
+    key: "TRON",
+    name: "TRỘN",
+    brief:
+      "Trộn số liệu với hình vẽ tay: một cảnh cho quy mô, một cảnh tự bố cục, " +
+      "một cảnh đối chiếu. Không cảnh nào được là 'khung mặc định'.",
+    spine: ["grid", "stream", "canvas", "compare"],
+    need: 3,
+    limit: ["bars"],
+  },
+];
+
+export const directionBlock = (dir, recentTypes = []) => {
+  const avoid = dir.limit.length
+    ? `\n- HẠN CHẾ TỐI ĐA (chỉ dùng khi bất khả kháng): ${dir.limit.join(", ")}`
+    : "";
+
+  const recent = recentTypes.length
+    ? `\n\n## CHUỖI CẢNH CỦA VIDEO TRƯỚC — KHÔNG ĐƯỢC GIỐNG\n${recentTypes
+        .map((t, i) => `- Video trước ${i + 1}: ${t}`)
+        .join("\n")}\n\nVideo đợt này phải có chuỗi primitive KHÁC. Tối thiểu: **3 cảnh đầu** không
+được trùng 3 cảnh đầu của bất kỳ video nào ở trên.`
+    : "";
+
+  return `## HƯỚNG DỰNG HÌNH ĐỢT NÀY — BẮT BUỘC
+
+Đợt này bạn dựng theo hướng: **${dir.name}**
+
+${dir.brief}
+
+- Phải có ÍT NHẤT ${dir.need} cảnh thuộc nhóm này: ${dir.spine
+    .map((s) => `"${s}"`)
+    .join(", ")}${avoid}${recent}`;
+};
+
 export const FREE_PRIMITIVES = `
 ## BỘ PRIMITIVE (13 cái — 8 cái dựng sẵn cho đẹp, "canvas" để tự vẽ,
 ## "grid/rack/stream/stamp" cho số liệu lớn và tỷ lệ)
@@ -186,7 +271,9 @@ Ví dụ một cảnh có đủ:
 
 `.trim();
 
-export const buildFreeformPrompt = (newsItems = [], bannedExtra = []) => {
+export const buildFreeformPrompt = (newsItems = [], bannedExtra = [], opts = {}) => {
+  const { direction = null, recentTypes = [] } = opts;
+
   const news = newsItems
     .map(
       (n, i) =>
@@ -212,11 +299,15 @@ ${news}${banned}
 
 ${FREE_PRIMITIVES}
 
+${direction ? directionBlock(direction, recentTypes) : ""}
+
 ## LUẬT VIẾT KỊCH BẢN
 1. Chọn ĐÚNG MỘT tin làm chủ đề. Không gộp nhiều tin rời rạc.
 2. Cấu trúc bắt buộc: cover (hook) → 5-7 cảnh thân → outro. Tổng 7-9 cảnh.
 3. Tổng thời lượng 35-45 giây là chuẩn; được phép tới 55 giây nếu cần đủ đất diễn đạt.
-4. Dùng ÍT NHẤT 4 loại primitive khác nhau. Không dùng 3 cảnh "bars" liên tiếp.
+4. Phải theo đúng "HƯỚNG DỰNG HÌNH" ở trên. Chuỗi primitive của video này phải KHÁC
+   chuỗi của các video trước — không được mở đầu bằng cùng một bộ cảnh quen thuộc.
+   Tuyệt đối không dùng 3 cảnh "bars" liên tiếp.
 5. Chỉ dùng primitive có trong danh sách trên. Không bịa type mới.
 6. "accent" phải là một từ CÓ THẬT trong "title", nguyên văn.
 7. Mọi con số phải xuất hiện trong tin đầu vào. Không suy diễn, không làm tròn bừa, không bịa số.
