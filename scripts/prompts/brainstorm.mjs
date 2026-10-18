@@ -11,7 +11,7 @@
  * Bước 1: buildBrainstormPrompt -> 5 phương án khác nhau về bản chất
  * Bước 2: buildScriptPrompt    -> chấm điểm, chọn, rồi viết kịch bản
  */
-import { FREE_PRIMITIVES } from "./freeform.mjs";
+import { FREE_PRIMITIVES, MOTION_KIT_DOC } from "./freeform.mjs";
 
 /** Menu rút gọn — chỉ để model biết cái gì dựng được, KHÔNG phải danh sách để chọn. */
 export const PRIMITIVE_MENU = `- cover   : mở đầu, một câu hook
@@ -26,7 +26,17 @@ export const PRIMITIVE_MENU = `- cover   : mở đầu, một câu hook
 - stream  : dải khối trôi ngang — cho KHỐI LƯỢNG dài
 - stamp   : con dấu số + thanh so sánh
 - canvas  : TỰ VẼ bằng toạ độ (text, rect, circle, line, polygon, path) trên khung 900x1200
-- outro   : kết, kêu gọi theo dõi`;
+- outro   : kết, kêu gọi theo dõi
+
+Component bố cục hoàn chỉnh (có chuyển động riêng):
+- kineticheadline : tiêu đề chữ lớn trượt vào, nhấn từ khoá
+- beforeafter     : vấn đề ở trên / giải pháp ở dưới
+- timelineflow    : các mốc thời gian, đường nối vẽ dần
+- processdiagram  : các bước nối bằng mũi tên
+- datastory       : biểu đồ cột / đường / vòng tròn, số đếm lên
+- floatingui      : cửa sổ giao diện bay vào, xếp lớp
+- networkmotion   : mạng node + hạt sáng chạy
+- brandendcard    : thẻ kết thương hiệu + CTA`;
 
 const fmtNews = (newsItems) =>
   newsItems
@@ -147,6 +157,8 @@ Nếu phương án hiển nhiên thắng, phải giải thích vì sao nó thậ
 ## CÔNG CỤ
 
 ${FREE_PRIMITIVES}
+
+${MOTION_KIT_DOC}
 
 ## LUẬT VIẾT KỊCH BẢN
 

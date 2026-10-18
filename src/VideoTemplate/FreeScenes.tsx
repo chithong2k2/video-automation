@@ -9,6 +9,7 @@ import {
 } from "remotion";
 import { P, FONT, enterStyle, OutroMark } from "./MotionVisuals";
 import { LIBRARY_SCENES } from "../library/Primitives";
+import { MOTION_KIT } from "../library/MotionKit";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FREE SCENES — bộ primitive để AI tự dựng graphic từ dữ liệu tin tức.
@@ -980,37 +981,45 @@ export const CanvasScene: React.FC<any> = ({ elements = [] }) => {
 // Thư viện primitive dùng lại được (grid/rack/stream/stamp…). Thêm primitive mới
 // chỉ cần đăng ký một dòng trong LIBRARY_SCENES, không phải sửa router này.
 export const renderFreeScene = (s: any) => {
-  const key = String(s?.type || "").toLowerCase();
+  // Nhận cả 2 quy ước:
+  //   { "type": "datastory", "title": "..." }            (phẳng — quy ước cũ)
+  //   { "component": "DataStory", "props": { ... } }     (lồng — như spec motion registry)
+  const key = String(s?.type || s?.component || "").toLowerCase();
+  const props =
+    s && typeof s.props === "object" && s.props !== null ? { ...s, ...s.props } : s;
+
+  const Kit = MOTION_KIT[key];
+  if (Kit) return <Kit {...props} />;
 
   const Lib = LIBRARY_SCENES[key];
-  if (Lib) return <Lib {...s} />;
+  if (Lib) return <Lib {...props} />;
 
   switch (key) {
     case "cover":
-      return <CoverScene {...s} />;
+      return <CoverScene {...props} />;
     case "stat":
-      return <StatScene {...s} />;
+      return <StatScene {...props} />;
     case "bars":
-      return <BarsScene {...s} />;
+      return <BarsScene {...props} />;
     case "compare":
-      return <CompareScene {...s} />;
+      return <CompareScene {...props} />;
     case "versus":
-      return <VersusScene {...s} />;
+      return <VersusScene {...props} />;
     case "steps":
-      return <StepsScene {...s} />;
+      return <StepsScene {...props} />;
     case "quote":
-      return <QuoteScene {...s} />;
+      return <QuoteScene {...props} />;
     case "canvas":
-      return <CanvasScene {...s} />;
+      return <CanvasScene {...props} />;
     case "outro":
-      return <OutroScene {...s} />;
+      return <OutroScene {...props} />;
     default:
       // Không nhận ra type → vẫn render được, không bao giờ ra khung trắng
       return (
         <div style={{ width: 900, fontFamily: FONT }}>
-          <Headline text={s?.title || s?.text || ""} size={76} />
-          {s?.note ? (
-            <div style={{ marginTop: 24, fontSize: 28, color: P.dim }}>{s.note}</div>
+          <Headline text={props?.title || props?.text || ""} size={76} />
+          {props?.note ? (
+            <div style={{ marginTop: 24, fontSize: 28, color: P.dim }}>{props.note}</div>
           ) : null}
         </div>
       );

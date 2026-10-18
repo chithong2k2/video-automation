@@ -10,6 +10,7 @@ import {
 } from "remotion";
 import { P, FONT, MotionBackground } from "./MotionVisuals";
 import { FreeHeader, renderFreeScene } from "./FreeScenes";
+import { SceneBackdrop } from "../library/MotionKit";
 
 const CL = { extrapolateLeft: "clamp" as const, extrapolateRight: "clamp" as const };
 
@@ -102,6 +103,13 @@ export const FreeVideo: React.FC<FreeScript> = (script) => {
       {timed.map(({ s, from, dur }, i) => (
         <Sequence key={i} from={from} durationInFrames={dur} name={`${i + 1}. ${s.type}`}>
           {s.audio ? <Audio src={staticFile(String(s.audio))} /> : null}
+          {s.backdrop ? (
+            <SceneBackdrop
+              preset={String(s.backdrop)}
+              intensity={Number(s.backdropIntensity ?? 1)}
+              palette={s.tint}
+            />
+          ) : null}
           <SceneWrap dur={dur}>{renderFreeScene(s)}</SceneWrap>
           {Array.isArray(s.words) && s.words.length ? <Karaoke words={s.words} /> : null}
         </Sequence>

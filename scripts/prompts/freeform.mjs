@@ -6,6 +6,37 @@
  * Mỗi primitive trong src/VideoTemplate/FreeScenes.tsx render được mọi nội dung
  * khớp schema — nên graphic thật sự thay đổi theo tin.
  */
+import { renderCatalog } from "../../src/library/catalog.mjs";
+
+/** Bộ component chuyển động dựng sẵn — sinh từ catalog, không viết tay lại. */
+export const MOTION_KIT_DOC = `
+## BỘ COMPONENT CHUYỂN ĐỘNG DỰNG SẴN (8 cái)
+
+Khác với primitive ở trên: những cái này là CẢ MỘT BỐ CỤC HOÀN CHỈNH có chuyển động
+riêng, không phải một khung chữ. Dùng khi cảnh cần "diễn" chứ không chỉ "hiện".
+
+${renderCatalog()}
+
+Quy tắc dùng bộ này:
+- Chọn theo Ý NGHĨA, không theo hình thức: có vấn đề + giải pháp -> beforeafter;
+  có mốc thời gian -> timelineflow; có quy trình -> processdiagram; có số liệu -> datastory.
+- Không lạm dụng: tối đa 3 cảnh thuộc bộ này trong một video 7-9 cảnh. Còn lại dùng
+  primitive thường hoặc canvas.
+- "networkmotion" là cảnh trang trí — chỉ dùng khi nội dung nói về kết nối/hệ sinh thái,
+  đừng dùng làm nền cho số liệu.
+- Mọi component đều có fallback: thiếu ảnh/thiếu dữ liệu thì tự lùi về bố cục chữ.
+  Vì vậy ĐỪNG bịa dữ liệu để lấp — thà dùng primitive chữ còn hơn.
+
+## LỚP NỀN THEO CẢNH — là THUỘC TÍNH, không phải một cảnh
+
+Mỗi cảnh có thể thêm trường "backdrop" để đổi nền riêng cho cảnh đó:
+
+  "backdrop": "grid" | "particles" | "rings" | "beams"    // tuỳ chọn
+  "backdropIntensity": 0.8                                 // 0.3 - 1.2
+
+Tuyệt đối KHÔNG tạo một cảnh riêng chỉ để làm nền — cảnh đó sẽ trống nội dung.
+`.trim();
+
 
 /**
  * HƯỚNG DỰNG HÌNH — luân phiên mỗi video một hướng.
@@ -300,6 +331,8 @@ Bạn KHÔNG chọn từ một danh sách khung có sẵn. Bạn tự quyết đ
 ${news}${banned}
 
 ${FREE_PRIMITIVES}
+
+${MOTION_KIT_DOC}
 
 ${direction ? directionBlock(direction, recentTypes) : ""}
 

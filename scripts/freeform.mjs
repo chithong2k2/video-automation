@@ -406,7 +406,8 @@ function render(scriptPath, outPath) {
       `--props=${scriptPath}`,
       "--concurrency=4",
     ],
-    { cwd: ROOT, stdio: "inherit" }
+    // Windows: npx là .cmd, execFileSync không spawn được nếu thiếu shell
+    { cwd: ROOT, stdio: "inherit", shell: process.platform === "win32" }
   );
   console.log(`✅ Xong: ${outPath}`);
 }
