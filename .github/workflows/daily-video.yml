@@ -22,6 +22,11 @@ on:
         required: false
         type: boolean
         default: false
+      publish:
+        description: "Đăng lên Facebook (tắt để render thử mà không đăng)"
+        required: false
+        type: boolean
+        default: true
 
 jobs:
   generate-and-post:
@@ -85,7 +90,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           node scripts/freeform.mjs live --out out/video.mp4 \
-            ${{ inputs.dry_run && '--dry-run' || '' }}
+            ${{ inputs.dry_run && '--dry-run' || '' }} \
+            ${{ !inputs.publish && '--no-publish' || '' }}
 
       # BÀI HỌC -> giữ pipeline cũ (chưa port sang hệ mới)
       - name: Render lesson video (pipeline cũ)
