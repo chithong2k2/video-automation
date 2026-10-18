@@ -2,13 +2,13 @@ name: Daily Video Pipeline
 
 on:
   schedule:
-    # 4 Video Tin Tức + 2 Video Bài Học B2B chia đều trong ngày (Giờ Việt Nam = UTC + 7)
-    - cron: "0 0 * * *"    # 07:00 Sáng VN -> Bản tin công nghệ & kinh doanh 1
-    - cron: "0 3 * * *"    # 10:00 Sáng VN -> Bài học thực chiến B2B 1
-    - cron: "0 6 * * *"    # 13:00 Chiều VN -> Bản tin công nghệ & kinh doanh 2
-    - cron: "0 9 * * *"    # 16:00 Chiều VN -> Bản tin công nghệ & kinh doanh 3
-    - cron: "30 11 * * *"  # 18:30 Tối VN -> Bài học thực chiến B2B 2
-    - cron: "30 13 * * *"  # 20:30 Tối VN -> Bản tin công nghệ & kinh doanh 4
+    # 4 Video Tin Tức + 2 Video Bài Học B2B chia đều trong ngày (Giờ Việt Nam = UTC + 7, chạy lệch phút chống nghẽn hàng đợi)
+    - cron: "15 0 * * *"   # 07:15 Sáng VN -> Bản tin công nghệ & kinh doanh 1
+    - cron: "5 3 * * *"    # 10:05 Sáng VN -> Bài học thực chiến B2B 1
+    - cron: "5 6 * * *"    # 13:05 Chiều VN -> Bản tin công nghệ & kinh doanh 2
+    - cron: "5 9 * * *"    # 16:05 Chiều VN -> Bản tin công nghệ & kinh doanh 3
+    - cron: "35 11 * * *"  # 18:35 Tối VN -> Bài học thực chiến B2B 2
+    - cron: "35 13 * * *"  # 20:35 Tối VN -> Bản tin công nghệ & kinh doanh 4
   workflow_dispatch:
     inputs:
       type:
