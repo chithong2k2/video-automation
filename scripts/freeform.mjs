@@ -1,19 +1,21 @@
 #!/usr/bin/env node
 /**
- * CHẾ ĐỘ TỰ DO — AI tự biên kịch + tự dựng graphic từ tin tức.
+ * CHẾ ĐỘ TỰ DO — AI tự biên kịch + tự dựng graphic từ tin tức, có giọng đọc.
  *
- *   node scripts/freeform.mjs render out/freeform-script.json
- *       → chỉ render một kịch bản JSON có sẵn (không cần API key)
+ *   node scripts/freeform.mjs render out/beam-library.json
+ *       → render một kịch bản có sẵn (không cần API key, không tạo voice)
+ *
+ *   node scripts/freeform.mjs voice out/beam-library.json
+ *       → tạo voice + karaoke cho kịch bản đã có, ghi lại JSON rồi render
  *
  *   node scripts/freeform.mjs live
- *       → Exa tìm tin thật → Gemini viết kịch bản theo prompt tự do → render
- *       (cần EXA_API_KEY + GEMINI_API_KEY)
+ *       → Exa tìm tin → Gemini viết kịch bản → voice → render
  *
- *   node scripts/freeform.mjs live --query "OpenAI doanh thu" --out out/khac.mp4
+ *   node scripts/freeform.mjs live --query "..." --out out/khac.mp4 --no-render
  */
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import { execSync, execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import axios from "axios";
 import "dotenv/config";
@@ -23,6 +25,7 @@ import { buildFreeformPrompt } from "./prompts/freeform.mjs";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const EXA_API_KEY = process.env.EXA_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const PYTHON_BIN = process.env.PYTHON_BIN || "python";
 
 const args = process.argv.slice(2);
 const mode = args[0] || "render";
@@ -54,11 +57,18 @@ async function fetchNews(query) {
   }));
 }
 
-// ─── Gemini: viết kịch bản theo prompt tự do ─────────────────────────────────
+// ─── Gemini: viết kịch bản ───────────────────────────────────────────────────
 async function writeScript(newsItems) {
   if (!GEMINI_API_KEY) throw new Error("Thiếu GEMINI_API_KEY");
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-  const prompt = buildFreeformPrompt(newsItems);
+
+  // Chủ đề các video gần nhất (workflow nạp từ release notes) -> cấm lặp
+  const banned = String(process.env.RECENT_TOPICS || "")
+    .split("||")
+    .map((t) => t.trim())
+    .filter(Boolean);
+
+  const prompt = buildFreeformPrompt(newsItems, banned);
 
   for (const name of ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash"]) {
     try {
@@ -77,6 +87,134 @@ async function writeScript(newsItems) {
     }
   }
   throw new Error("Cả 3 model đều thất bại");
+}
+
+// ─── Voice: edge-tts cho từng cảnh + word boundary để karaoke ───────────────
+const VOICE_DIR = path.join(ROOT, "public", "voice");
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function ttsScene(text, index) {
+  fs.mkdirSync(VOICE_DIR, { recursive: true });
+  fs.mkdirSync(path.join(ROOT, "out"), { recursive: true });
+
+  const name = `s${String(index + 1).padStart(2, "0")}`;
+  const txt = path.join(ROOT, "out", `tts_${name}.txt`);
+  const mp3 = path.join(VOICE_DIR, `${name}.mp3`);
+  const sub = path.join(VOICE_DIR, `${name}.json`);
+
+  fs.writeFileSync(txt, text, "utf8");
+  execSync(`${PYTHON_BIN} scripts/tts.py "${txt}" "${mp3}" "${sub}"`, {
+    cwd: ROOT,
+    stdio: "inherit",
+  });
+
+  const words = JSON.parse(fs.readFileSync(sub, "utf8"));
+  const dur = words.length ? words[words.length - 1].end : 0;
+  if (!words.length || dur <= 0) {
+    throw new Error("edge-tts trả về 0 từ — coi như thất bại");
+  }
+  return {
+    audio: `voice/${name}.mp3`,
+    words: words.map((w) => ({ w: w.word, s: w.start, e: w.end })),
+    dur,
+  };
+}
+
+/** edge-tts hay chập chờn (403 / no audio) -> thử lại, chờ tăng dần. */
+async function ttsSceneRetry(text, index) {
+  let last;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return ttsScene(text, index);
+    } catch (e) {
+      last = e;
+      if (attempt < 3) {
+        console.warn(`   ↻ lỗi (${e.message.split("\n")[0].slice(0, 60)}) — thử lại ${attempt + 1}/3`);
+        await sleep(2000 * attempt);
+      }
+    }
+  }
+  throw last;
+}
+
+/**
+ * Sinh giọng cho mọi cảnh có "voiceover".
+ * Scene tự dài ra nếu giọng đọc dài hơn thời lượng khai báo — không bao giờ cắt cụt câu.
+ */
+async function addVoice(script) {
+  const scenes = script.scenes || [];
+  let made = 0;
+
+  for (let i = 0; i < scenes.length; i++) {
+    const text = String(scenes[i].voiceover || "").trim();
+    if (!text) continue;
+
+    if (i > 0) await sleep(1200);
+    process.stdout.write(`🎙️ Cảnh ${i + 1}: "${text.slice(0, 52)}…" `);
+    const { audio, words, dur } = await ttsSceneRetry(text, i);
+    scenes[i].audio = audio;
+    scenes[i].words = words;
+    scenes[i].seconds = Math.max(
+      Number(scenes[i].seconds) || 4,
+      Number((dur + 0.5).toFixed(2))
+    );
+    console.log(`→ ${dur.toFixed(2)}s, ${words.length} từ`);
+    made++;
+  }
+
+  if (!made) {
+    console.warn('⚠️ Không cảnh nào có "voiceover" — video sẽ không có tiếng.');
+  }
+  return script;
+}
+
+// ─── Đăng bài: GitHub Release CDN + webhook Activepieces ─────────────────────
+const WEBHOOK = process.env.ACTIVEPIECES_WEBHOOK_URL;
+const REPO = process.env.RELEASE_REPO || "chithong2k2/video-automation";
+
+function uploadToRelease(videoPath, script) {
+  const tag = `v${Date.now()}`;
+  const topic = (script.metadata?.topic || "Video Nexo Studio").replace(/["\r\n]/g, " ");
+  const storyKey = (script.metadata?.storyKey || "").replace(/["\r\n]/g, " ");
+  const notes = `TOPIC: ${topic} :: ${storyKey}\nAutomated daily video`;
+
+  console.log("☁️ Upload lên GitHub Release...");
+  execSync(
+    `gh release create "${tag}" "${videoPath}#video.mp4" --title "Daily Video ${new Date()
+      .toISOString()
+      .slice(0, 10)}" --notes "${notes}" --repo ${REPO}`,
+    { cwd: ROOT, stdio: "inherit" }
+  );
+  const url = `https://github.com/${REPO}/releases/download/${tag}/video.mp4`;
+  console.log("✅ CDN:", url);
+  return url;
+}
+
+async function triggerWebhook(videoUrl, script) {
+  if (!WEBHOOK) {
+    console.warn("⚠️ Thiếu ACTIVEPIECES_WEBHOOK_URL — video đã render nhưng KHÔNG được đăng.");
+    return false;
+  }
+  const scenes = script.scenes || [];
+  const cta =
+    [...scenes].reverse().find((s) => s.cta)?.cta || "Theo dõi Nexo Studio";
+  const tags = script.metadata?.hashtags || ["#nexostudio", "#congnghe"];
+
+  console.log("🔔 Gửi Activepieces...");
+  await axios.post(WEBHOOK, {
+    videoUrl,
+    title: script.metadata?.topic || "Video Nexo Studio",
+    hashtags: Array.isArray(tags) ? tags.join(" ") : tags,
+    cta,
+    timestamp: new Date().toISOString(),
+  });
+  console.log("✅ Đã đăng.");
+  return true;
+}
+
+async function publish(videoPath, script) {
+  const url = uploadToRelease(videoPath, script);
+  await triggerWebhook(url, script);
 }
 
 // ─── Render ──────────────────────────────────────────────────────────────────
@@ -103,11 +241,29 @@ function render(scriptPath, outPath) {
   console.log(`✅ Xong: ${outPath}`);
 }
 
+const save = (script, file = "out/freeform-script.json") => {
+  fs.writeFileSync(path.resolve(ROOT, file), JSON.stringify(script, null, 2), "utf8");
+  console.log(`📝 Kịch bản: ${file}`);
+  return file;
+};
+
 // ─── Main ────────────────────────────────────────────────────────────────────
 (async () => {
   if (mode === "render") {
     const file = args[1] || "out/freeform-script.json";
     render(file, flag("out", "out/freeform.mp4"));
+    return;
+  }
+
+  if (mode === "voice") {
+    const file = args[1];
+    if (!file) {
+      throw new Error("Thiếu đường dẫn JSON: node scripts/freeform.mjs voice out/x.json");
+    }
+    const script = JSON.parse(fs.readFileSync(path.resolve(ROOT, file), "utf8"));
+    await addVoice(script);
+    save(script, file);
+    if (!args.includes("--no-render")) render(file, flag("out", "out/freeform.mp4"));
     return;
   }
 
@@ -117,21 +273,25 @@ function render(scriptPath, outPath) {
     if (!news.length) throw new Error("Exa không trả về tin nào");
 
     const script = await writeScript(news);
-    const jsonPath = "out/freeform-script.json";
-    fs.writeFileSync(
-      path.resolve(ROOT, jsonPath),
-      JSON.stringify(script, null, 2),
-      "utf8"
-    );
-    console.log(`📝 Kịch bản: ${jsonPath}`);
+    await addVoice(script);
+    const jsonPath = save(script, flag("json", "out/freeform-script.json"));
 
-    if (!args.includes("--no-render")) {
-      render(jsonPath, flag("out", "out/freeform.mp4"));
+    const total = (script.scenes || []).reduce((n, s) => n + (s.seconds || 4), 0);
+    console.log(`📊 Tổng thời lượng: ${total.toFixed(1)}s · ${script.scenes.length} cảnh`);
+
+    if (args.includes("--dry-run")) {
+      console.log("🧪 Dry run — không render, không đăng.");
+      return;
     }
+    if (args.includes("--no-render")) return;
+
+    const out = flag("out", "out/freeform.mp4");
+    render(jsonPath, out);
+    if (!args.includes("--no-publish")) await publish(out, script);
     return;
   }
 
-  console.error("Dùng: node scripts/freeform.mjs [render <file> | live]");
+  console.error("Dùng: node scripts/freeform.mjs [render <file> | voice <file> | live]");
   process.exit(1);
 })().catch((e) => {
   console.error("❌", e.message);

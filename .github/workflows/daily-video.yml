@@ -65,13 +65,27 @@ jobs:
           echo "Nạp được $COUNT chủ đề cũ để loại trừ"
           echo "RECENT_TOPICS=$RECENT" >> "$GITHUB_ENV"
 
-      - name: Run pipeline
+      # TIN TỨC -> hệ mới: FreeVideo + thư viện primitive + voice từng cảnh
+      - name: Render news video (FreeVideo + voice)
+        if: ${{ (inputs.type || 'auto') != 'lesson' }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
           ACTIVEPIECES_WEBHOOK_URL: ${{ secrets.ACTIVEPIECES_WEBHOOK_URL }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/pipeline.mjs --type=${{ inputs.type || 'auto' }} ${{ inputs.dry_run && '--dry-run' || '' }}
+        run: |
+          node scripts/freeform.mjs live --out out/video.mp4 \
+            ${{ inputs.dry_run && '--dry-run' || '' }}
+
+      # BÀI HỌC -> giữ pipeline cũ (chưa port sang hệ mới)
+      - name: Render lesson video (pipeline cũ)
+        if: ${{ (inputs.type || 'auto') == 'lesson' }}
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
+          ACTIVEPIECES_WEBHOOK_URL: ${{ secrets.ACTIVEPIECES_WEBHOOK_URL }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/pipeline.mjs --type=lesson ${{ inputs.dry_run && '--dry-run' || '' }}
 
       # Giữ video như artifact phòng khi cần xem lại
       - name: Upload video artifact

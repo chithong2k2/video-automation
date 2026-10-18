@@ -1,8 +1,10 @@
 import React from "react";
 import {
   AbsoluteFill,
+  Audio,
   Sequence,
   interpolate,
+  staticFile,
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
@@ -99,10 +101,59 @@ export const FreeVideo: React.FC<FreeScript> = (script) => {
 
       {timed.map(({ s, from, dur }, i) => (
         <Sequence key={i} from={from} durationInFrames={dur} name={`${i + 1}. ${s.type}`}>
+          {s.audio ? <Audio src={staticFile(String(s.audio))} /> : null}
           <SceneWrap dur={dur}>{renderFreeScene(s)}</SceneWrap>
+          {Array.isArray(s.words) && s.words.length ? <Karaoke words={s.words} /> : null}
         </Sequence>
       ))}
     </AbsoluteFill>
+  );
+};
+
+// ─── Karaoke: tô sáng đúng từ đang được đọc, theo word-boundary của edge-tts ──
+const Karaoke: React.FC<{ words: { w: string; s: number; e: number }[] }> = ({
+  words,
+}) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const t = frame / fps;
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: 76,
+        right: 76,
+        bottom: 148,
+        display: "flex",
+        flexWrap: "wrap",
+        justifyContent: "center",
+        gap: "0 12px",
+        fontFamily: FONT,
+        fontSize: 42,
+        fontWeight: 800,
+        lineHeight: 1.38,
+        textAlign: "center",
+        zIndex: 30,
+      }}
+    >
+      {words.map((w, i) => {
+        const on = t >= w.s && t < w.e;
+        const done = t >= w.e;
+        return (
+          <span
+            key={i}
+            style={{
+              color: on ? P.sky : done ? P.text : "rgba(248,250,252,0.38)",
+              textShadow: "0 4px 22px rgba(0,0,0,0.9)",
+              transform: on ? "translateY(-2px)" : "none",
+            }}
+          >
+            {w.w}
+          </span>
+        );
+      })}
+    </div>
   );
 };
 

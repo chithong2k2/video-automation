@@ -7,7 +7,8 @@
     "pipeline": "node scripts/pipeline.mjs",
     "freeform": "node scripts/freeform.mjs render",
     "freeform:live": "node scripts/freeform.mjs live",
-    "build": "remotion render src/index.ts VideoTemplate out/test.mp4"
+    "build": "remotion render src/index.ts VideoTemplate out/test.mp4",
+    "freeform:voice": "node scripts/freeform.mjs voice"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",

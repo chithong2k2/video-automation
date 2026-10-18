@@ -159,6 +159,26 @@ Dùng khi tin có một cột mốc long trọng (giấy phép, chứng nhận, 
     { "name":"NVFP4", "value":0.5, "note":"nhẹ nhất" }
   ],
   "caption":"Ba định dạng checkpoint · BF16 = 2 byte, FP8 = 1 byte, NVFP4 = 0,5 byte." }
+## LỜI THOẠI (bắt buộc, mọi cảnh đều phải có)
+
+Mỗi cảnh có thêm trường "voiceover": câu tiếng Việt sẽ được đọc thành tiếng.
+
+- 12–22 từ mỗi câu. Đọc tự nhiên, như đang nói với người xem, không như đọc báo.
+- Câu này KHÔNG hiện trên hình. Chữ trên hình (headline, title, label) viết ngắn;
+  voiceover mới là câu nói đầy đủ.
+- Đừng lặp lại y nguyên chữ trên hình. Hình và lời phải bổ sung cho nhau.
+- Viết số bằng CHỮ để giọng đọc không sai: "mười nghìn năm trăm GPU", "hai mươi ba tỷ",
+  "một triệu token", "Apache hai chấm không".
+- Từ viết tắt đọc được thì để nguyên (GPU, AI, NVFP4), từ khó đọc thì viết theo âm.
+- Tổng độ dài lời thoại quyết định độ dài video. Video sẽ tự dài ra nếu lời dài hơn
+  "seconds" khai báo — nên đừng viết quá dài, mục tiêu cả video 35–45 giây.
+
+Ví dụ một cảnh có đủ:
+{ "type":"grid", "seconds":7, "voiceover":"Mỗi lần chạy, chỉ hai mươi ba tỷ tham số được đánh thức. Chưa tới năm phần trăm bộ não đó thực sự hoạt động.",
+  "eyebrow":"Mỗi token đi qua", "headline":"Chỉ một phần nhỏ bật sáng",
+  "cols":27, "total":501, "active":23, "totalUnit":"tỷ",
+  "percentLabel":"tham số hoạt động mỗi token" }
+
 `.trim();
 
 export const buildFreeformPrompt = (newsItems = [], bannedExtra = []) => {
