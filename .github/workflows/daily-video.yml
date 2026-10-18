@@ -49,6 +49,17 @@ jobs:
           npm ci
           python -m pip install --upgrade "edge-tts==7.3.1"
 
+      # Nạp chủ đề ~15 video gần nhất để pipeline không lặp lại cùng một tin
+      - name: Load recent topics
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RECENT=$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=15" \
+            --jq '[.[] | (.body // "") | split("\n") | map(select(startswith("TOPIC:"))) | .[0] // "" | sub("^TOPIC:[ ]*"; "")] | map(select(. != "")) | join(" || ")')
+          COUNT=$(printf '%s' "$RECENT" | grep -o '||' | wc -l)
+          echo "Nạp được $COUNT chủ đề cũ để loại trừ"
+          echo "RECENT_TOPICS=$RECENT" >> "$GITHUB_ENV"
+
       - name: Run pipeline
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

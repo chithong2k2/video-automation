@@ -29,6 +29,86 @@ if (!EXA_API_KEY) {
   console.warn("⚠️ Thiếu EXA_API_KEY — sẽ không lấy được tin thật, kịch bản dùng chủ đề chung.");
 }
 
+// ─── Chống lặp chủ đề ────────────────────────────────────────────────────────
+// Workflow nạp danh sách chủ đề của ~15 video gần nhất vào biến này.
+// Trước đây không có gì chặn -> 5 video liên tiếp cùng đưa tin Replit/Anthropic.
+const RECENT_TOPICS = (process.env.RECENT_TOPICS || "")
+  .split("||")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+// Từ không tính là "thực thể" khi so trùng
+const ENTITY_STOP = new Set([
+  "ai", "ceo", "cto", "cfo", "usd", "vnd", "url", "api", "app", "saas", "sme",
+  "b2b", "the", "and", "for", "with", "new",
+]);
+
+/** Rút các danh từ riêng (tên công ty, sản phẩm) khỏi tiêu đề để so trùng. */
+function extractEntities(raw) {
+  const words = String(raw || "").split(/[^\p{L}\p{N}.]+/u).filter(Boolean);
+  const out = new Set();
+
+  words.forEach((w, i) => {
+    if (w.length < 3) return;
+
+    // Từ đầu câu: tiếng Việt viết hoa đầu câu nên dễ nhiễu.
+    // Chỉ giữ nếu là chữ Latin không dấu (Replit, Anthropic, Shopee...) — từ tiếng
+    // Việt viết hoa đầu câu hầu như luôn có dấu (Giải, Báo, Chính...).
+    if (i === 0 && !/^[\x20-\x7E]+$/.test(w)) return;
+
+    const isAllCap = /^[A-Z0-9]{2,}$/.test(w);
+    const isCap = /^\p{Lu}/u.test(w) && !isAllCap;
+    if (!isCap && !isAllCap) return;
+
+    const low = w.toLowerCase();
+    if (ENTITY_STOP.has(low)) return;
+    out.add(low);
+  });
+
+  return out;
+}
+
+/**
+ * Trả về chủ đề cũ bị trùng, hoặc null nếu không trùng.
+ * So 2 lớp: storyKey do AI sinh, và tên riêng trùng nhau.
+ */
+function findDuplicate(topic, storyKey, recentTopics) {
+  const key = String(storyKey || "").toLowerCase().trim();
+
+  for (const old of recentTopics) {
+    // Dòng cũ có dạng "Tiêu đề :: storyKey"
+    const [oldTopic, oldKeyRaw] = old.split(" :: ");
+    const oldKey = String(oldKeyRaw || "").toLowerCase().trim();
+
+    if (key && oldKey && key === oldKey) {
+      return { topic: oldTopic, reason: `cùng storyKey "${key}"` };
+    }
+
+    const a = extractEntities(topic);
+    const b = extractEntities(oldTopic);
+    const shared = [...a].filter((x) => b.has(x));
+    if (shared.length > 0) {
+      return { topic: oldTopic, reason: `trùng tên riêng: ${shared.join(", ")}` };
+    }
+  }
+  return null;
+}
+
+/** Khối chặn chủ đề nhét vào prompt. */
+function buildExclusionBlock(recentTopics) {
+  const list = [...new Set(recentTopics.map((t) => t.split(" :: ")[0]))];
+  if (list.length === 0) return "";
+
+  return `
+## ⛔ CHỦ ĐỀ ĐÃ ĐƯA TIN RỒI — TUYỆT ĐỐI KHÔNG CHỌN LẠI
+
+${list.map((t, i) => `${i + 1}. ${t}`).join("\n")}
+
+Nếu tin nổi bật nhất trùng với danh sách trên — cùng công ty, cùng sự kiện, hoặc cùng câu chuyện —
+hãy CHỌN TIN KHÁC trong dữ liệu bên dưới. Không được kể lại cùng một sự kiện bằng từ ngữ khác.
+`;
+}
+
 // ─── Bước 1: Exa AI tìm kiếm tin tức thực tế trên Internet ────────────────────
 async function fetchNews(topicQuery = "AI startup tech business Vietnam 2026") {
   console.log(`🔍 Exa AI đang tìm kiếm tin tức thật trên Internet theo từ khóa: "${topicQuery}"...`);
@@ -43,7 +123,7 @@ async function fetchNews(topicQuery = "AI startup tech business Vietnam 2026") {
       "https://api.exa.ai/search",
       {
         query: topicQuery,
-        numResults: 5,
+        numResults: 8,
         useAutoprompt: true,
         contents: { text: { maxCharacters: 800 } },
       },
@@ -73,7 +153,7 @@ async function fetchNews(topicQuery = "AI startup tech business Vietnam 2026") {
 // ══════════════════════════════════════════════════════════════════════════════
 // PROMPT 1: NEXO STUDIO — AI STORYTELLING & SOFTWARE SOLUTION VIDEO DIRECTOR
 // ══════════════════════════════════════════════════════════════════════════════
-async function generateStorytellingScript(newsItems) {
+async function generateStorytellingScript(newsItems, bannedExtra = []) {
   console.log("💡 [PROMPT 1] Kích hoạt NEXO STUDIO — AI STORYTELLING & SOFTWARE SOLUTION VIDEO DIRECTOR...");
 
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
@@ -115,7 +195,7 @@ Không biến toàn bộ video thành các dòng chữ xuất hiện trên nền
 
 Dữ liệu tham khảo:
 ${contextText}
-
+${buildExclusionBlock([...RECENT_TOPICS, ...bannedExtra])}
 Chọn một vấn đề kinh doanh cụ thể và một giải pháp có thể giải thích bằng hình ảnh.
 
 Các nhóm chủ đề:
@@ -200,6 +280,7 @@ Sử dụng cấu trúc:
 {
   "metadata": {
     "topic": "Tên chủ đề ngắn gọn",
+    "storyKey": "slug-2-4-tu-khong-dau-cua-su-kien, vd: replit-anthropic",
     "industry": "Ngành nghề",
     "targetAudience": "Chủ shop, Founder, Doanh nghiệp SME",
     "problem": "Vấn đề cốt lõi",
@@ -340,7 +421,7 @@ Sử dụng cấu trúc:
 // ══════════════════════════════════════════════════════════════════════════════
 // PROMPT 2: NEXO STUDIO — AI DAILY NEWS VIDEO DIRECTOR
 // ══════════════════════════════════════════════════════════════════════════════
-async function generateDailyNewsScript(newsItems) {
+async function generateDailyNewsScript(newsItems, bannedExtra = []) {
   console.log("📰 [PROMPT 2] Kích hoạt NEXO STUDIO — AI DAILY NEWS VIDEO DIRECTOR...");
 
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
@@ -369,7 +450,7 @@ Mỗi cảnh phải có một ý tưởng hình ảnh cụ thể giúp người 
 
 Dữ liệu tin tức mới nhất từ hệ thống tìm kiếm:
 ${newsText}
-
+${buildExclusionBlock([...RECENT_TOPICS, ...bannedExtra])}
 Chọn một tin tức mới, đáng chú ý, có giá trị với người xem Việt Nam.
 Các nhóm chủ đề:
 - AI, công nghệ và sản phẩm mới.
@@ -417,6 +498,7 @@ Sử dụng cấu trúc:
 {
   "metadata": {
     "topic": "Tiêu đề ngắn gọn của sự kiện",
+    "storyKey": "slug-2-4-tu-khong-dau-cua-su-kien, vd: replit-anthropic",
     "category": "TECH NEWS",
     "eventDate": "Ngày sự kiện diễn ra",
     "publishedAt": "Ngày đăng của nguồn chính",
@@ -758,13 +840,18 @@ async function renderVideo(script, voiceData) {
 }
 
 // ─── Bước 5: Upload video lên GitHub Release CDN cho Facebook ─────────────────
-async function uploadToDrive(videoPath) {
+async function uploadToDrive(videoPath, script) {
   console.log("☁️ Đang upload video lên GitHub CDN Storage...");
   const tag = `v${Date.now()}`;
 
+  // Ghi chủ đề vào notes để lần chạy sau đọc lại và tránh lặp tin
+  const topic = (script.metadata?.topic || "Video Nexo Studio").replace(/["\r\n]/g, " ");
+  const storyKey = (script.metadata?.storyKey || "").replace(/["\r\n]/g, " ");
+  const notes = `TOPIC: ${topic} :: ${storyKey}\nAutomated daily video`;
+
   try {
     execSync(
-      `gh release create "${tag}" "${videoPath}#video.mp4" --title "Daily Video ${new Date().toISOString().slice(0, 10)}" --notes "Automated daily video" --repo chithong2k2/video-automation`,
+      `gh release create "${tag}" "${videoPath}#video.mp4" --title "Daily Video ${new Date().toISOString().slice(0, 10)}" --notes "${notes}" --repo chithong2k2/video-automation`,
       { stdio: "inherit" }
     );
     const publicUrl = `https://github.com/chithong2k2/video-automation/releases/download/${tag}/video.mp4`;
@@ -825,19 +912,63 @@ async function main() {
   console.log(`📌 Kịch bản được chọn: [${videoType === "news" ? "DAILY TECH NEWS" : "STORYTELLING & SOFTWARE SOLUTION"}]`);
 
   try {
+    // Xoay từ khóa theo slot trong ngày: 6 video/ngày mà query cố định thì Exa
+    // trả về đúng 5 kết quả y nhau -> Gemini luôn chọn cùng một tin.
+    const QUERY_POOL = [
+      "AI startup funding round announcement technology",
+      "SaaS product launch enterprise software update",
+      "Vietnam digital transformation business technology",
+      "ecommerce retail technology platform Southeast Asia",
+      "workflow automation software small business",
+      "big tech AI model release announcement",
+      "fintech payments digital banking Southeast Asia",
+      "cloud infrastructure developer tools release",
+    ];
+    const vnHour = (new Date().getUTCHours() + 7) % 24;
+    const dayOfYear = Math.floor(
+      (Date.now() - Date.UTC(new Date().getUTCFullYear(), 0, 0)) / 86400000
+    );
+    const poolIndex = (dayOfYear * 3 + vnHour) % QUERY_POOL.length;
+
     const searchQuery =
       videoType === "news"
-        ? "AI startup tech business news update 2026"
+        ? QUERY_POOL[poolIndex]
         : "business software automation case study B2B growth";
+
+    console.log(`🔎 Từ khóa tìm tin: "${searchQuery}"`);
+    if (RECENT_TOPICS.length > 0) {
+      console.log(`🚫 Đã loại trừ ${RECENT_TOPICS.length} chủ đề gần nhất khỏi lựa chọn`);
+    }
 
     const news = await fetchNews(searchQuery);
 
-    let script;
-    if (videoType === "news") {
-      script = await generateDailyNewsScript(news);
-    } else {
-      script = await generateStorytellingScript(news);
+    // Sinh kịch bản + chặn lặp chủ đề (tối đa 3 lần)
+    let script = null;
+    const bannedExtra = [];
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const candidate =
+        videoType === "news"
+          ? await generateDailyNewsScript(news, bannedExtra)
+          : await generateStorytellingScript(news, bannedExtra);
+
+      const topic = candidate.metadata?.topic || "";
+      const dup = findDuplicate(topic, candidate.metadata?.storyKey, RECENT_TOPICS);
+      if (!dup) {
+        script = candidate;
+        break;
+      }
+
+      console.warn(`⚠️ Lần ${attempt}: chủ đề "${topic}" trùng với "${dup.topic}" (${dup.reason}) — viết lại.`);
+      bannedExtra.push(topic);
     }
+
+    if (!script) {
+      throw new Error(
+        "Không tạo được kịch bản không trùng sau 3 lần. Nguồn tin quá ít — kiểm tra EXA_API_KEY hoặc đổi từ khóa."
+      );
+    }
+
+    console.log(`✅ Chủ đề chốt: "${script.metadata?.topic}"`);
 
     const voiceText =
       script.voiceoverFullText ||
@@ -847,7 +978,7 @@ async function main() {
 
     const audioData = await generateVoice(voiceText);
     const videoPath = await renderVideo(script, audioData);
-    const videoUrl = await uploadToDrive(videoPath);
+    const videoUrl = await uploadToDrive(videoPath, script);
     await triggerWebhook(videoUrl, script);
 
     console.log(`\n🎉 Pipeline [${videoType.toUpperCase()}] hoàn thành xuất sắc!`);
